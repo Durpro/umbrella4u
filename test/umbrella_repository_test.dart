@@ -24,6 +24,18 @@ void main() {
     );
   });
 
+  test('shows the message an AppException was written with', () {
+    expect(
+      friendlyError(const AppException('Please log in to continue.')),
+      'Please log in to continue.',
+    );
+    expect(
+      friendlyError(Exception('duplicate key value')),
+      'You have already done that.',
+    );
+    expect(friendlyError(Exception('boom')), startsWith('Something went'));
+  });
+
   group('preview repository', () {
     late UmbrellaRepository repository;
 
@@ -58,5 +70,38 @@ void main() {
       expect(after.first.text, 'A small test win.');
       expect(after.first.pollOptions, hasLength(2));
     });
+
+    test('reports the hug that opening an umbrella applied', () async {
+      final stories = await repository.fetchStories();
+      final target = stories.firstWhere((story) => !story.hasHug);
+
+      final hugged = await repository.openUmbrella(
+        target,
+        note: 'Thinking of you',
+      );
+
+      expect(hugged, isTrue);
+      final updated = (await repository.fetchStories()).firstWhere(
+        (story) => story.id == target.id,
+      );
+      expect(updated.hasUmbrella, isTrue);
+      expect(updated.hasHug, isTrue);
+      expect(updated.hugCount, target.hugCount + 1);
+    });
+
+    test(
+      'refuses an umbrella on your own story with a readable reason',
+      () async {
+        final mine = StoryItem.fromMap(const {
+          'id': 'mine',
+          'text': 'x',
+        }, isMine: true);
+
+        expect(
+          () => repository.openUmbrella(mine),
+          throwsA(isA<AppException>()),
+        );
+      },
+    );
   });
 }

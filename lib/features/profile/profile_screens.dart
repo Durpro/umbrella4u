@@ -99,7 +99,10 @@ class _ProfilePageState extends State<ProfilePage>
       if (controller.profile == null) await controller.refreshProfile();
       final profile = controller.profile;
       if (profile == null) {
-        throw const AppException('Your profile could not be found.');
+        // Surface why the load failed when the controller knows, so a dropped
+        // connection does not read as a missing profile.
+        throw controller.profileError ??
+            const AppException('Your profile could not be found.');
       }
       final results = await Future.wait<dynamic>([
         controller.repository.fetchProfileStats(),
@@ -723,7 +726,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     return SwipeBackScope(
       child: Scaffold(
         appBar: AppBar(
-          title: Text('@${widget.username}'),
+          // Prefer the resolved handle: the value navigated with may have been
+          // a display name carried on a story.
+          title: Text('@${profile?.username ?? widget.username}'),
           backgroundColor: Colors.transparent,
           surfaceTintColor: Colors.transparent,
         ),

@@ -39,7 +39,12 @@ class InboxPageState extends State<InboxPage>
 
   Future<void> refresh() async {
     final controller = AppScope.of(context);
-    if (!controller.isLoggedIn && !controller.isDemo) return;
+    if (!controller.isLoggedIn && !controller.isDemo) {
+      // There is nothing to fetch for a guest, but the header spinner still
+      // has to stop or it runs forever behind the sign-in prompt.
+      if (mounted && _loading) setState(() => _loading = false);
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -47,12 +52,14 @@ class InboxPageState extends State<InboxPage>
     try {
       final items = await controller.repository.fetchInbox();
       if (!mounted) return;
+      controller.reportRequestSuccess();
       setState(() {
         _items = items;
         _loading = false;
       });
     } catch (error) {
       if (!mounted) return;
+      controller.reportRequestFailure(error);
       setState(() {
         _error = error;
         _loading = false;
@@ -83,7 +90,10 @@ class InboxPageState extends State<InboxPage>
       }
       if (mounted) showAppMessage(context, 'Your thank-you was sent.');
     } catch (error) {
-      if (mounted) showAppMessage(context, friendlyError(error), error: true);
+      if (mounted) {
+        AppScope.of(context).reportRequestFailure(error);
+        showAppMessage(context, friendlyError(error), error: true);
+      }
     } finally {
       if (mounted) setState(() => _busyId = null);
     }
@@ -98,7 +108,7 @@ class InboxPageState extends State<InboxPage>
       title: 'Inbox',
       subtitle: 'Umbrellas, kind words, and thank-yous.',
       onRefresh: refresh,
-      trailing: _loading && _items.isNotEmpty
+      trailing: _loading
           ? CupertinoActivityIndicator(
               radius: 9,
               color: Theme.of(context).colorScheme.primary,
@@ -113,8 +123,6 @@ class InboxPageState extends State<InboxPage>
               action: () => requireMember(context),
               actionLabel: 'Log in or sign up',
             )
-          : _loading && _items.isEmpty
-          ? const LoadingCards(count: 3)
           : _error != null && _items.isEmpty
           ? ErrorState(message: friendlyError(_error!), onRetry: refresh)
           : _items.isEmpty
@@ -220,12 +228,14 @@ class _NotificationsPreviewSheetState
     try {
       final items = await controller.repository.fetchInbox();
       if (!mounted) return;
+      controller.reportRequestSuccess();
       setState(() {
         _items = items;
         _loading = false;
       });
     } catch (error) {
       if (!mounted) return;
+      controller.reportRequestFailure(error);
       setState(() {
         _error = error;
         _loading = false;
@@ -244,7 +254,7 @@ class _NotificationsPreviewSheetState
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         child: GlassSurface(
           borderRadius: BorderRadius.circular(28),
-          opacity: 0.95,
+          opacity: 1,
           tint: accent,
           child: Material(
             color: Colors.transparent,

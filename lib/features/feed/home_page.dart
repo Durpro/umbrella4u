@@ -32,6 +32,9 @@ class HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin {
   Object? _error;
   bool _loading = true;
   String? _category;
+  final _categoryScrollController = ScrollController();
+  bool _categoriesAtStart = true;
+  bool _categoriesAtEnd = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -39,7 +42,33 @@ class HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin {
   @override
   void initState() {
     super.initState();
+    _categoryScrollController.addListener(_updateCategoryScrollEdges);
     WidgetsBinding.instance.addPostFrameCallback((_) => refresh());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _updateCategoryScrollEdges(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _categoryScrollController
+      ..removeListener(_updateCategoryScrollEdges)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _updateCategoryScrollEdges() {
+    if (!_categoryScrollController.hasClients) return;
+    final position = _categoryScrollController.position;
+    final atStart = position.pixels <= 0.5;
+    final atEnd = position.pixels >= position.maxScrollExtent - 0.5;
+    if (atStart == _categoriesAtStart && atEnd == _categoriesAtEnd) return;
+    if (mounted) {
+      setState(() {
+        _categoriesAtStart = atStart;
+        _categoriesAtEnd = atEnd;
+      });
+    }
   }
 
   Future<void> refresh() async {
@@ -55,6 +84,7 @@ class HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin {
         repository.fetchCommunityPulse(),
       ]);
       if (!mounted) return;
+      AppScope.of(context).reportRequestSuccess();
       setState(() {
         _stories = results[0] as List<StoryItem>;
         _pulse = results[1] as CommunityPulseData;
@@ -62,6 +92,7 @@ class HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin {
       });
     } catch (error) {
       if (!mounted) return;
+      AppScope.of(context).reportRequestFailure(error);
       setState(() {
         _error = error;
         _loading = false;
@@ -153,46 +184,62 @@ class HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin {
                   delay: const Duration(milliseconds: 195),
                   child: SizedBox(
                     height: 44,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                            avatar: const Icon(
-                              Icons.grid_view_rounded,
-                              size: 17,
-                            ),
-                            label: const Text('All stories'),
-                            selected: _category == null,
-                            onSelected: (_) => _selectCategory(null),
-                          ),
-                        ),
-                        ...communityCategories.map(
-                          (category) => Padding(
+                    child: ShaderMask(
+                      blendMode: BlendMode.dstIn,
+                      shaderCallback: (bounds) => LinearGradient(
+                        colors: [
+                          _categoriesAtStart
+                              ? Colors.black
+                              : Colors.transparent,
+                          Colors.black,
+                          Colors.black,
+                          _categoriesAtEnd ? Colors.black : Colors.transparent,
+                        ],
+                        stops: const [0, 0.06, 0.91, 1],
+                      ).createShader(bounds),
+                      child: ListView(
+                        controller: _categoryScrollController,
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          Padding(
                             padding: const EdgeInsets.only(right: 8),
                             child: ChoiceChip(
-                              avatar: Icon(
-                                category.icon,
+                              avatar: const Icon(
+                                Icons.grid_view_rounded,
                                 size: 17,
-                                color: _category == category.key
-                                    ? Colors.white
-                                    : category.color,
                               ),
-                              label: Text(category.name),
-                              selected: _category == category.key,
-                              selectedColor: category.color,
-                              labelStyle: TextStyle(
-                                color: _category == category.key
-                                    ? Colors.white
-                                    : AppTheme.secondaryInk,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              onSelected: (_) => _selectCategory(category.key),
+                              label: const Text('All stories'),
+                              selected: _category == null,
+                              onSelected: (_) => _selectCategory(null),
                             ),
                           ),
-                        ),
-                      ],
+                          ...communityCategories.map(
+                            (category) => Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ChoiceChip(
+                                avatar: Icon(
+                                  category.icon,
+                                  size: 17,
+                                  color: _category == category.key
+                                      ? Colors.white
+                                      : category.color,
+                                ),
+                                label: Text(category.name),
+                                selected: _category == category.key,
+                                selectedColor: category.color,
+                                labelStyle: TextStyle(
+                                  color: _category == category.key
+                                      ? Colors.white
+                                      : AppTheme.secondaryInk,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                onSelected: (_) =>
+                                    _selectCategory(category.key),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 
 import 'app_models.dart';
@@ -17,28 +16,44 @@ class AppTheme {
   static const navigationMuted = Color(0xFFC8B4CD);
 
   static ThemeData build(AppThemeChoice choice) {
+    final themedBackground = Color.alphaBlend(
+      choice.accent.withValues(alpha: 0.14),
+      background,
+    );
+    final themedSurface = Color.alphaBlend(
+      choice.accent.withValues(alpha: 0.045),
+      surface,
+    );
+    final themedSoftSurface = Color.alphaBlend(
+      choice.accent.withValues(alpha: 0.08),
+      softSurface,
+    );
+    final themedBorder = Color.alphaBlend(
+      choice.accent.withValues(alpha: 0.16),
+      border,
+    );
     final scheme =
         ColorScheme.fromSeed(
           seedColor: choice.accent,
           brightness: Brightness.light,
-          surface: surface,
+          surface: themedSurface,
         ).copyWith(
           primary: choice.accent,
           onPrimary: Colors.white,
           secondary: choice.deep,
           onSecondary: Colors.white,
-          surface: surface,
+          surface: themedSurface,
           onSurface: ink,
-          outline: border,
-          outlineVariant: border,
+          outline: themedBorder,
+          outlineVariant: themedBorder,
           surfaceTint: choice.accent,
         );
 
     return ThemeData(
       useMaterial3: true,
-      scaffoldBackgroundColor: background,
-      canvasColor: background,
-      cardColor: surface,
+      scaffoldBackgroundColor: themedBackground,
+      canvasColor: themedBackground,
+      cardColor: themedSurface,
       colorScheme: scheme,
       splashFactory: NoSplash.splashFactory,
       splashColor: Colors.transparent,
@@ -48,12 +63,12 @@ class AppTheme {
       materialTapTargetSize: MaterialTapTargetSize.padded,
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: <TargetPlatform, PageTransitionsBuilder>{
-          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.fuchsia: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.windows: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.android: LiquidPageTransitionsBuilder(),
+          TargetPlatform.fuchsia: LiquidPageTransitionsBuilder(),
+          TargetPlatform.iOS: LiquidPageTransitionsBuilder(),
+          TargetPlatform.linux: LiquidPageTransitionsBuilder(),
+          TargetPlatform.macOS: LiquidPageTransitionsBuilder(),
+          TargetPlatform.windows: LiquidPageTransitionsBuilder(),
         },
       ),
       textTheme: const TextTheme(
@@ -94,7 +109,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: softSurface,
+        fillColor: themedSoftSurface.withValues(alpha: 0.86),
         hintStyle: const TextStyle(color: mutedInk),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
@@ -102,7 +117,7 @@ class AppTheme {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: border),
+          borderSide: BorderSide(color: themedBorder),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
@@ -140,18 +155,18 @@ class AppTheme {
         ),
       ),
       cardTheme: CardThemeData(
-        color: surface,
+        color: themedSurface,
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(22),
-          side: const BorderSide(color: border),
+          side: BorderSide(color: themedBorder),
         ),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: softSurface,
+        backgroundColor: themedSoftSurface,
         selectedColor: choice.accent.withValues(alpha: 0.14),
-        side: const BorderSide(color: border),
+        side: BorderSide(color: themedBorder),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
         labelStyle: const TextStyle(
           color: secondaryInk,
@@ -160,12 +175,12 @@ class AppTheme {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
       ),
       popupMenuTheme: PopupMenuThemeData(
-        color: surface,
+        color: themedSurface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: border),
+          side: BorderSide(color: themedBorder),
         ),
       ),
       appBarTheme: const AppBarTheme(
@@ -173,15 +188,15 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
       ),
-      dividerTheme: const DividerThemeData(color: border, thickness: 1),
+      dividerTheme: DividerThemeData(color: themedBorder, thickness: 1),
       dialogTheme: DialogThemeData(
-        backgroundColor: surface,
+        backgroundColor: themedSurface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       ),
-      bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: surface,
-        modalBackgroundColor: surface,
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: themedSurface,
+        modalBackgroundColor: themedSurface,
         surfaceTintColor: Colors.transparent,
         showDragHandle: true,
         shape: RoundedRectangleBorder(
@@ -190,7 +205,7 @@ class AppTheme {
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: choice.accent,
-        linearTrackColor: border,
+        linearTrackColor: themedBorder,
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: navigationPlum,
@@ -198,6 +213,47 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         behavior: SnackBarBehavior.floating,
         elevation: 0,
+      ),
+    );
+  }
+}
+
+/// Pages arrive with a soft squeeze rather than a directional slide. This
+/// keeps nested Haven screens feeling connected to the surface beneath them.
+class LiquidPageTransitionsBuilder extends PageTransitionsBuilder {
+  const LiquidPageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) return child;
+    final squeeze = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutBack,
+    );
+    final fade = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+    return FadeTransition(
+      opacity: fade,
+      child: AnimatedBuilder(
+        animation: squeeze,
+        child: child,
+        builder: (context, child) {
+          final value = squeeze.value.clamp(0.0, 1.08);
+          return Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.diagonal3Values(
+              0.89 + (0.11 * value),
+              0.965 + (0.035 * value),
+              1,
+            ),
+            child: child,
+          );
+        },
       ),
     );
   }

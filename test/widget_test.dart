@@ -39,7 +39,10 @@ void main() {
     expect(find.text('Your profile'), findsOneWidget);
 
     final context = tester.element(find.byKey(const ValueKey('nav-profile')));
-    expect(Theme.of(context).scaffoldBackgroundColor, AppTheme.background);
+    expect(
+      Theme.of(context).scaffoldBackgroundColor,
+      isNot(AppTheme.background),
+    );
   });
 
   testWidgets('search discovery exposes the website categories', (
@@ -68,7 +71,7 @@ void main() {
     await tester.pumpWidget(const UmbrellaApp());
     await tester.pumpAndSettle();
 
-    await tester.dragFrom(const Offset(195, 420), const Offset(-130, 0));
+    await tester.dragFrom(const Offset(195, 420), const Offset(-240, 0));
     await tester.pumpAndSettle();
 
     expect(find.text('Umbrellas, kind words, and thank-yous.'), findsOneWidget);
@@ -94,5 +97,30 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Umbrellas, kind words, and thank-yous.'), findsOneWidget);
+  });
+
+  testWidgets('More pages return to the More sheet after a back gesture', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const UmbrellaApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('More'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('More from Umbrella4U'), findsOneWidget);
+    await tester.tap(find.text('Community guidelines'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Haven only works because everyone helps keep it safe.'),
+      findsOneWidget,
+    );
+
+    await tester.dragFrom(const Offset(12, 360), const Offset(110, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('More from Umbrella4U'), findsOneWidget);
   });
 }

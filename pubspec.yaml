@@ -34,6 +34,9 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  # Grapheme-safe string handling in the data layer, which must not import the
+  # widget library just to shorten a line of text.
+  characters: ^1.4.1
   supabase_flutter: ^2.16.0
   url_launcher: ^6.3.2
 

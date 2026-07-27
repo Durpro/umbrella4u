@@ -61,11 +61,16 @@ class _UmbrellaAppState extends State<UmbrellaApp> {
             debugShowCheckedModeBanner: false,
             theme: AppTheme.build(_controller.theme),
             scrollBehavior: const CozyScrollBehavior(),
-            home: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 320),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              child: _rootFor(_controller),
+            home: Stack(
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 320),
+                  switchInCurve: Curves.easeOutBack,
+                  switchOutCurve: Curves.easeInCubic,
+                  child: _rootFor(_controller),
+                ),
+                ConnectionStatusBanner(visible: _controller.offline),
+              ],
             ),
           ),
         );

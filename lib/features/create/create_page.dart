@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_controller.dart';
 import '../../core/app_models.dart';
@@ -263,7 +262,8 @@ class CreatePageState extends State<CreatePage>
               children: [
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: () => launchUrl(Uri.parse('tel:988')),
+                    onPressed: () =>
+                        openExternalUri(sheetContext, Uri.parse('tel:988')),
                     icon: const Icon(Icons.call_rounded),
                     label: const Text('Call 9-8-8'),
                   ),
@@ -271,7 +271,8 @@ class CreatePageState extends State<CreatePage>
                 const SizedBox(width: 10),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => launchUrl(Uri.parse('sms:988')),
+                    onPressed: () =>
+                        openExternalUri(sheetContext, Uri.parse('sms:988')),
                     icon: const Icon(Icons.sms_outlined),
                     label: const Text('Text 9-8-8'),
                   ),
@@ -282,7 +283,8 @@ class CreatePageState extends State<CreatePage>
             SizedBox(
               width: double.infinity,
               child: TextButton(
-                onPressed: () => launchUrl(Uri.parse('https://988.ca/')),
+                onPressed: () =>
+                    openExternalUri(sheetContext, Uri.parse('https://988.ca/')),
                 child: const Text('Visit 988.ca'),
               ),
             ),
@@ -310,7 +312,7 @@ class CreatePageState extends State<CreatePage>
       trailing: RoundIconButton(
         icon: Icons.refresh_rounded,
         tooltip: 'Clear draft',
-        onPressed: _text.text.isEmpty ? () {} : resetDraft,
+        onPressed: _text.text.isEmpty ? null : resetDraft,
       ),
       child: canPost
           ? Column(
@@ -837,10 +839,23 @@ class _PollEditorState extends State<_PollEditor> {
 
 final _emailPattern = RegExp(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}');
 
+/// First-person crisis language, kept deliberately narrow.
+///
+/// Matching here stops a story from being posted at all, so the pattern must
+/// not swallow ordinary venting ("this feels hopeless", "I can't go on like
+/// this"), grief ("we lost her to suicide"), or someone asking how to help a
+/// friend — all of which are exactly what a peer-support feed is for.
 final _crisisPattern = RegExp(
-  r'(kill(ing)? myself|\bkms\b|end (it all|my life)|want(ed)? to die|'
-  r'wish i (was|were) dead|nothing to live for|don.?t want to (live|exist)|'
-  r'better off dead|can.?t go on|self[-\s]?harm|hurt(ing)? myself|'
-  r'suicid(e|al)|hopeless)',
+  r"\b(?:"
+  r"kill(?:ing)? myself|killed myself|kms|"
+  r"end(?:ing)? (?:it all|my life)|"
+  r"take (?:my own life|my life)|"
+  r"self[-\s]?harm(?:ing)?|hurt(?:ing)? myself|cut(?:ting)? myself|"
+  r"better off dead|nothing to live for|"
+  r"(?:want|wanted|wanting|wish) (?:to die|to be dead|i was dead|i were dead)|"
+  r"don'?t want to (?:live|exist|be here|wake up)|"
+  r"(?:think|thinking|thought) about (?:suicide|killing myself|ending it)|"
+  r"(?:i'?m|i am|i feel|feeling|felt) (?:really |so |very |kind of |kinda )?suicidal"
+  r")\b",
   caseSensitive: false,
 );

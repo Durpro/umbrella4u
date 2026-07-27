@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:characters/characters.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -97,25 +98,50 @@ class UmbrellaRepository {
   }
 
   Future<UserProfile?> fetchProfileByUsername(String username) async {
+    final needle = username.trim();
+    if (needle.isEmpty) return null;
     final client = _client;
     if (client == null) {
       return _demoPeople
-          .where((profile) => profile.username == username)
+          .where((profile) => profile.username == needle)
           .firstOrNull;
     }
     final map = await client
         .from('profiles')
         .select(_publicProfileProjection)
-        .eq('username', username)
+        .eq('username', needle)
         .eq('discoverable', true)
         .maybeSingle();
-    return map == null ? null : UserProfile.fromMap(map);
+    if (map != null) return UserProfile.fromMap(map);
+
+    // A story only carries `author_name`, which may hold a display name rather
+    // than a handle. Fall back to it so opening an author still resolves.
+    final rows = await client
+        .from('profiles')
+        .select(_publicProfileProjection)
+        .eq('display_name', needle)
+        .eq('discoverable', true)
+        .limit(1);
+    final matches = _maps(rows);
+    return matches.isEmpty ? null : UserProfile.fromMap(matches.first);
   }
 
   Future<void> updateProfile(Map<String, dynamic> values) async {
     final client = _requireClient();
     final user = _requireUser();
-    await client.from('profiles').update(values).eq('id', user.id);
+    // PostgREST reports success when an update matches no rows, so the write is
+    // confirmed here. Otherwise a missing profile row fails silently and the
+    // member is returned to onboarding forever.
+    final saved = await client
+        .from('profiles')
+        .update(values)
+        .eq('id', user.id)
+        .select('id');
+    if (_maps(saved).isEmpty) {
+      throw const AppException(
+        'Your profile could not be saved. Please log out, log back in, and try again.',
+      );
+    }
   }
 
   Future<ProfileStats> fetchProfileStats() async {
@@ -440,7 +466,9 @@ class UmbrellaRepository {
     return true;
   }
 
-  Future<void> openUmbrella(StoryItem story, {String? note}) async {
+  /// Opens an umbrella and returns whether the story now also carries a hug
+  /// from this member, so the card never shows a hug that was not recorded.
+  Future<bool> openUmbrella(StoryItem story, {String? note}) async {
     if (story.isMine) {
       throw const AppException(
         'This is your story—you cannot open an umbrella on your own post.',
@@ -452,9 +480,11 @@ class UmbrellaRepository {
         _demoStories[index] = story.copyWith(
           hasUmbrella: true,
           umbrellaCount: story.umbrellaCount + 1,
+          hasHug: true,
+          hugCount: story.hasHug ? story.hugCount : story.hugCount + 1,
         );
       }
-      return;
+      return true;
     }
     final user = _requireUser();
     await _client.from('umbrellas').insert({
@@ -462,15 +492,17 @@ class UmbrellaRepository {
       'user_id': user.id,
       'note': note?.trim().isEmpty == true ? null : note?.trim(),
     });
-    if (!story.hasHug) {
-      try {
-        await _client.from('hugs').insert({
-          'story_id': story.id,
-          'user_id': user.id,
-        });
-      } catch (_) {
-        // An umbrella is the primary action. A duplicate hug is harmless.
-      }
+    if (story.hasHug) return true;
+    try {
+      await _client.from('hugs').insert({
+        'story_id': story.id,
+        'user_id': user.id,
+      });
+      return true;
+    } catch (_) {
+      // An umbrella is the primary action. A hug that does not land is
+      // cosmetic, so report it honestly instead of failing the whole action.
+      return false;
     }
   }
 
@@ -553,26 +585,40 @@ class UmbrellaRepository {
       );
     }
 
-    final safe = query.replaceAll(RegExp(r'[,().]'), ' ').trim();
-    final like = '%$safe%';
-    final peopleRows = await _client
-        .from('profiles')
-        .select(_publicProfileProjection)
-        .eq('discoverable', true)
-        .or('username.ilike.$like,display_name.ilike.$like')
-        .limit(20);
-    final storyRows = await _client
-        .from('stories')
-        .select(_storyProjection)
-        .eq('state', 'live')
-        .ilike('text', like)
-        .order('created_at', ascending: false)
-        .limit(30);
-    final stories = await _hydrateStoryMaps(_maps(storyRows));
+    // Each column is filtered through its own request rather than a hand-built
+    // `or=` string. Values are then parameters instead of filter syntax, so no
+    // character in a member's query can be read as part of the filter.
+    final like = '%${_escapeLikePattern(query)}%';
+    final results = await Future.wait<dynamic>([
+      _client
+          .from('profiles')
+          .select(_publicProfileProjection)
+          .eq('discoverable', true)
+          .ilike('username', like)
+          .limit(20),
+      _client
+          .from('profiles')
+          .select(_publicProfileProjection)
+          .eq('discoverable', true)
+          .ilike('display_name', like)
+          .limit(20),
+      _client
+          .from('stories')
+          .select(_storyProjection)
+          .eq('state', 'live')
+          .ilike('text', like)
+          .order('created_at', ascending: false)
+          .limit(30),
+    ]);
+
+    final people = <String, UserProfile>{};
+    for (final row in [..._maps(results[0]), ..._maps(results[1])]) {
+      final profile = UserProfile.fromMap(row);
+      people.putIfAbsent(profile.id, () => profile);
+    }
+    final stories = await _hydrateStoryMaps(_maps(results[2]));
     return SearchResults(
-      people: _maps(
-        peopleRows,
-      ).map(UserProfile.fromMap).toList(growable: false),
+      people: people.values.take(20).toList(growable: false),
       stories: stories,
     );
   }
@@ -721,8 +767,24 @@ class AppException implements Exception {
   String toString() => message;
 }
 
+/// Escapes the characters PostgreSQL reads as wildcards inside `LIKE`, so a
+/// search for "100%" cannot quietly match the entire community.
+String _escapeLikePattern(String value) {
+  return value
+      .replaceAll(r'\', r'\\')
+      .replaceAll('%', r'\%')
+      .replaceAll('_', r'\_');
+}
+
 String friendlyError(Object error) {
+  // An AppException is written for the member who will read it. Anything else
+  // is a raw backend failure that has to be translated first.
+  if (error is AppException) return error.message;
+
   final source = error.toString();
+  if (isNetworkError(error)) {
+    return 'No internet connection. Check your connection and try again.';
+  }
   if (source.contains('blocked_content')) {
     return 'This text may contain harmful language. Please rephrase it with care.';
   }
@@ -748,11 +810,19 @@ String friendlyError(Object error) {
   if (source.contains('Email not confirmed')) {
     return 'Please confirm your email before logging in.';
   }
-  return source
-      .replaceFirst('AuthException(message: ', '')
-      .replaceFirst('PostgrestException(message: ', '')
-      .split(', code:')[0]
-      .replaceAll(RegExp(r'\)$'), '');
+  return 'Something went wrong. Please try again.';
+}
+
+bool isNetworkError(Object error) {
+  final source = error.toString().toLowerCase();
+  return source.contains('failed to fetch') ||
+      source.contains('network') ||
+      source.contains('socketexception') ||
+      source.contains('connection refused') ||
+      source.contains('connection reset') ||
+      source.contains('host lookup') ||
+      source.contains('clientexception') ||
+      source.contains('timed out');
 }
 
 const _profileProjection =
@@ -793,7 +863,9 @@ bool _isStorySunny(Map<String, dynamic> story) {
 }
 
 String _excerpt(String value) {
-  return value.length <= 80 ? value : '${value.substring(0, 80)}…';
+  // Counted in graphemes so an excerpt never cuts an emoji or an accent apart.
+  final characters = value.characters;
+  return characters.length <= 80 ? value : '${characters.take(80)}…';
 }
 
 List<StoryItem> _makeDemoStories() {

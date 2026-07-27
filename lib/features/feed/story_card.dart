@@ -30,6 +30,7 @@ class _StoryCardState extends State<StoryCard> {
   bool _busyUmbrella = false;
   bool _reported = false;
   bool _marked = false;
+  bool _revealed = false;
 
   @override
   void initState() {
@@ -199,14 +200,16 @@ class _StoryCardState extends State<StoryCard> {
 
     setState(() => _busyUmbrella = true);
     try {
-      await _repository.openUmbrella(_story, note: note);
+      final hugged = await _repository.openUmbrella(_story, note: note);
       if (!mounted) return;
       setState(() {
         _story = _story.copyWith(
           hasUmbrella: true,
           umbrellaCount: _story.umbrellaCount + 1,
-          hasHug: true,
-          hugCount: _story.hasHug ? _story.hugCount : _story.hugCount + 1,
+          hasHug: hugged,
+          hugCount: hugged && !_story.hasHug
+              ? _story.hugCount + 1
+              : _story.hugCount,
         );
       });
       await showDialog<void>(
@@ -511,11 +514,16 @@ class _StoryCardState extends State<StoryCard> {
               ],
             ),
             const SizedBox(height: 16),
-            if (warning.isNotEmpty) ...[
+            if (warning.isEmpty)
+              storyBody
+            else if (_revealed) ...[
               const _ContentWarningLabel(),
               const SizedBox(height: 10),
-            ],
-            storyBody,
+              storyBody,
+            ] else
+              _ContentWarningCover(
+                onReveal: () => setState(() => _revealed = true),
+              ),
             const SizedBox(height: 19),
             Row(
               children: [
@@ -604,6 +612,76 @@ class _StoryCardState extends State<StoryCard> {
               child: Text(
                 'One umbrella each · no threads · always kind',
                 style: TextStyle(color: AppTheme.mutedInk, fontSize: 10.5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Keeps a sensitive story hidden until the reader asks for it, which is what
+/// the composer promises when someone adds a cover to their post.
+class _ContentWarningCover extends StatelessWidget {
+  const _ContentWarningCover({required this.onReveal});
+
+  final VoidCallback onReveal;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Sensitive content, hidden until you choose to read it',
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF7EA).withValues(alpha: 0.8),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFF0D9AF)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: const BoxDecoration(
+                color: Color(0xFFF6E7CC),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.visibility_off_outlined,
+                size: 21,
+                color: Color(0xFF9B6B24),
+              ),
+            ),
+            const SizedBox(height: 11),
+            const Text(
+              'Sensitive content',
+              style: TextStyle(
+                color: Color(0xFF754C13),
+                fontSize: 13.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'This story is covered until you feel ready to read it.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFF8A6B32),
+                fontSize: 11.5,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 13),
+            OutlinedButton.icon(
+              onPressed: onReveal,
+              icon: const Icon(Icons.visibility_outlined, size: 18),
+              label: const Text('Reveal story'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF8A642D),
+                side: const BorderSide(color: Color(0xFFE0C795)),
               ),
             ),
           ],

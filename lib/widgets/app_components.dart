@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_models.dart';
 import '../core/app_theme.dart';
+import '../data/umbrella_repository.dart' show AppConfig;
 
 class BrandMark extends StatelessWidget {
   const BrandMark({super.key, this.size = 42, this.showName = true});
@@ -200,7 +202,8 @@ class GlassSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = tint ?? Theme.of(context).colorScheme.primary;
-    final base = (surfaceColor ?? AppTheme.surface).withValues(alpha: opacity);
+    final base = (surfaceColor ?? Theme.of(context).colorScheme.surface)
+        .withValues(alpha: opacity);
     final highlight = Color.alphaBlend(
       Colors.white.withValues(alpha: 0.18),
       base,
@@ -208,7 +211,7 @@ class GlassSurface extends StatelessWidget {
     final tinted = Color.alphaBlend(accent.withValues(alpha: 0.035), base);
     final borderColor = Color.alphaBlend(
       Colors.white.withValues(alpha: 0.36),
-      AppTheme.border.withValues(alpha: 0.82),
+      Theme.of(context).colorScheme.outline.withValues(alpha: 0.82),
     );
 
     return Container(
@@ -239,6 +242,162 @@ class GlassSurface extends StatelessWidget {
   }
 }
 
+/// Adds a small lift/glow response to important actions on pointer devices
+/// and touch screens while leaving the button's own semantics and behavior
+/// intact.
+class PremiumButtonMotion extends StatefulWidget {
+  const PremiumButtonMotion({
+    super.key,
+    required this.child,
+    this.enabled = true,
+    this.glowColor,
+    this.hoverScale = 1.035,
+    this.pressScale = 1.055,
+  });
+
+  final Widget child;
+  final bool enabled;
+  final Color? glowColor;
+  final double hoverScale;
+  final double pressScale;
+
+  @override
+  State<PremiumButtonMotion> createState() => _PremiumButtonMotionState();
+}
+
+class _PremiumButtonMotionState extends State<PremiumButtonMotion> {
+  bool _hovered = false;
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final active = widget.enabled && (_hovered || _pressed);
+    final accent = widget.glowColor ?? Theme.of(context).colorScheme.primary;
+    final duration = reduceMotion
+        ? Duration.zero
+        : const Duration(milliseconds: 180);
+
+    return MouseRegion(
+      onEnter: widget.enabled ? (_) => setState(() => _hovered = true) : null,
+      onExit: widget.enabled ? (_) => setState(() => _hovered = false) : null,
+      child: Listener(
+        onPointerDown: widget.enabled
+            ? (_) => setState(() => _pressed = true)
+            : null,
+        onPointerUp: widget.enabled
+            ? (_) => setState(() => _pressed = false)
+            : null,
+        onPointerCancel: widget.enabled
+            ? (_) => setState(() => _pressed = false)
+            : null,
+        child: AnimatedContainer(
+          duration: duration,
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: active
+                ? [
+                    BoxShadow(
+                      color: accent.withValues(alpha: _pressed ? 0.2 : 0.28),
+                      blurRadius: _pressed ? 16 : 23,
+                      spreadRadius: -5,
+                      offset: const Offset(0, 7),
+                    ),
+                  ]
+                : null,
+          ),
+          child: AnimatedScale(
+            scale: reduceMotion
+                ? 1
+                : _pressed
+                ? widget.pressScale
+                : _hovered
+                ? widget.hoverScale
+                : 1,
+            duration: duration,
+            curve: Curves.easeOutBack,
+            child: widget.child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ConnectionStatusBanner extends StatelessWidget {
+  const ConnectionStatusBanner({super.key, required this.visible});
+
+  final bool visible;
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    return SafeArea(
+      child: IgnorePointer(
+        ignoring: !visible,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: AnimatedSlide(
+            duration: reduceMotion
+                ? Duration.zero
+                : const Duration(milliseconds: 360),
+            curve: Curves.easeOutBack,
+            offset: visible ? Offset.zero : const Offset(0, -1.35),
+            child: AnimatedOpacity(
+              duration: reduceMotion
+                  ? Duration.zero
+                  : const Duration(milliseconds: 180),
+              opacity: visible ? 1 : 0,
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(18, 8, 18, 0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3A2047),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.16),
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x4023152B),
+                      blurRadius: 20,
+                      offset: Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.cloud_off_outlined,
+                      color: Color(0xFFFFD979),
+                      size: 18,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'No internet — showing what we can.',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Adds a familiar iOS-style left-edge gesture to pages that were pushed onto
 /// the navigator. The interaction stays deliberately small so horizontal
 /// lists, text selection, and the main tab swipe remain unaffected.
@@ -252,8 +411,8 @@ class SwipeBackScope extends StatefulWidget {
 }
 
 class _SwipeBackScopeState extends State<SwipeBackScope> {
-  static const _edgeWidth = 28.0;
-  static const _dismissDistance = 72.0;
+  static const _edgeWidth = 44.0;
+  static const _dismissDistance = 58.0;
   double _dragDistance = 0;
 
   void _updateDrag(DragUpdateDetails details) {
@@ -266,7 +425,7 @@ class _SwipeBackScopeState extends State<SwipeBackScope> {
 
   void _endDrag(DragEndDetails details) {
     final velocity = details.primaryVelocity ?? 0;
-    final shouldPop = _dragDistance >= _dismissDistance || velocity >= 420;
+    final shouldPop = _dragDistance >= _dismissDistance || velocity >= 320;
     setState(() => _dragDistance = 0);
     if (shouldPop) Navigator.of(context).maybePop();
   }
@@ -409,7 +568,10 @@ class RoundIconButton extends StatefulWidget {
   });
 
   final IconData icon;
-  final VoidCallback onPressed;
+
+  /// A null callback renders the button as unavailable rather than as a
+  /// tappable control that quietly does nothing.
+  final VoidCallback? onPressed;
   final String tooltip;
   final bool badge;
 
@@ -433,23 +595,25 @@ class _RoundIconButtonState extends State<RoundIconButton> {
         ? Duration.zero
         : Duration(milliseconds: _pressed ? 85 : 180);
     final radius = BorderRadius.circular(17);
+    final enabled = widget.onPressed != null;
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Semantics(
           button: true,
+          enabled: enabled,
           label: widget.tooltip,
           onTap: widget.onPressed,
           child: Tooltip(
             message: widget.tooltip,
             excludeFromSemantics: true,
             child: AnimatedScale(
-              scale: reduceMotion ? 1 : (_pressed ? 0.94 : 1),
+              scale: reduceMotion || !enabled ? 1 : (_pressed ? 0.94 : 1),
               duration: pressDuration,
               curve: _pressed ? Curves.easeOut : Curves.easeOutBack,
               child: AnimatedOpacity(
-                opacity: _pressed ? 0.78 : 1,
+                opacity: enabled ? (_pressed ? 0.78 : 1) : 0.45,
                 duration: pressDuration,
                 curve: Curves.easeOut,
                 child: GlassSurface(
@@ -472,7 +636,9 @@ class _RoundIconButtonState extends State<RoundIconButton> {
                         height: 48,
                         child: Icon(
                           widget.icon,
-                          color: AppTheme.secondaryInk,
+                          color: enabled
+                              ? AppTheme.secondaryInk
+                              : AppTheme.mutedInk,
                           size: 22,
                         ),
                       ),
@@ -694,6 +860,17 @@ class _SkeletonLine extends StatelessWidget {
   }
 }
 
+/// Only avatars served by this project's own Supabase storage are fetched over
+/// the network. Any other host would turn every profile view into a request to
+/// a third party that could log the viewer's address, which an anonymous
+/// community cannot allow.
+bool isTrustedAvatarUrl(String value) {
+  final uri = Uri.tryParse(value);
+  if (uri == null || uri.scheme != 'https' || !uri.hasAuthority) return false;
+  final project = Uri.tryParse(AppConfig.supabaseUrl);
+  return project != null && uri.host == project.host;
+}
+
 class ProfileAvatar extends StatelessWidget {
   const ProfileAvatar({super.key, required this.profile, this.size = 48});
 
@@ -703,8 +880,7 @@ class ProfileAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final imageUrl = profile.avatarUrl;
-    final isImage =
-        imageUrl.startsWith('https://') || imageUrl.startsWith('http://');
+    final isImage = isTrustedAvatarUrl(imageUrl);
     return Container(
       width: size,
       height: size,
@@ -763,6 +939,25 @@ class PremiumActivityIndicator extends StatelessWidget {
               )
             : CupertinoActivityIndicator(radius: radius, color: indicatorColor),
       ),
+    );
+  }
+}
+
+/// Opens [uri] outside the app, reporting failure instead of throwing. Crisis
+/// resources route through here, so a device that cannot dial or text must
+/// still tell the member something rather than appear to do nothing.
+Future<void> openExternalUri(BuildContext context, Uri uri) async {
+  var launched = false;
+  try {
+    launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } catch (_) {
+    launched = false;
+  }
+  if (!launched && context.mounted) {
+    showAppMessage(
+      context,
+      'This action is not available on this device.',
+      error: true,
     );
   }
 }

@@ -1,10 +1,6 @@
-import 'dart:ui';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../core/app_controller.dart';
 import '../../core/app_theme.dart';
 import '../create/create_page.dart';
 import '../feed/home_page.dart';
@@ -12,6 +8,7 @@ import '../inbox/inbox_page.dart';
 import '../profile/profile_screens.dart';
 import '../search/search_page.dart';
 import '../settings/settings_screens.dart';
+import '../../widgets/app_components.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -25,39 +22,48 @@ class _AppShellState extends State<AppShell>
   final _homeKey = GlobalKey<HomePageState>();
   final _inboxKey = GlobalKey<InboxPageState>();
   final _createKey = GlobalKey<CreatePageState>();
-  late final List<Widget?> _pages;
-  late final AnimationController _tabTransitionController;
-  late final Animation<double> _tabOpacity;
-  late final Animation<Offset> _tabOffset;
+  late final List<Widget> _pages;
+  late final PageController _pageController;
+  late final ValueNotifier<double> _pagePosition;
+  late final AnimationController _tapLiftController;
+  late final Animation<double> _tapLift;
   int _selectedIndex = 0;
-  double _tabSwipeDistance = 0;
 
   @override
   void initState() {
     super.initState();
-    _pages = List<Widget?>.filled(5, null);
-    _pages[0] = _buildPage(0);
-    _tabTransitionController = AnimationController(
+    _pages = List<Widget>.generate(5, _buildPage, growable: false);
+    _pagePosition = ValueNotifier<double>(0);
+    _pageController = PageController()..addListener(_trackPagePosition);
+    _tapLiftController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 190),
-      value: 1,
+      duration: const Duration(milliseconds: 180),
     );
-    final curve = CurvedAnimation(
-      parent: _tabTransitionController,
-      curve: Curves.easeOutCubic,
-    );
-    _tabOpacity = Tween<double>(begin: 0.88, end: 1).animate(curve);
-    _tabOffset = Tween<Offset>(
-      begin: const Offset(0, 0.008),
-      end: Offset.zero,
-    ).animate(curve);
+    _tapLift = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: 0,
+          end: -6,
+        ).chain(CurveTween(curve: Curves.easeOutCubic)),
+        weight: 42,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: -6,
+          end: 0,
+        ).chain(CurveTween(curve: Curves.easeOutCubic)),
+        weight: 58,
+      ),
+    ]).animate(_tapLiftController);
     WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _tabTransitionController.dispose();
+    _pageController.dispose();
+    _pagePosition.dispose();
+    _tapLiftController.dispose();
     super.dispose();
   }
 
@@ -74,14 +80,11 @@ class _AppShellState extends State<AppShell>
       if (index == 1) _inboxKey.currentState?.refresh();
       return;
     }
-    final page = _pages[index] ?? _buildPage(index);
     HapticFeedback.selectionClick();
-    setState(() {
-      _pages[index] = page;
-      _selectedIndex = index;
-    });
-    _animateTabChange();
-    if (index == 1) _inboxKey.currentState?.refresh();
+    _pageController.jumpToPage(index);
+    if (MediaQuery.maybeOf(context)?.disableAnimations != true) {
+      _tapLiftController.forward(from: 0);
+    }
   }
 
   Widget _buildPage(int index) {
@@ -103,81 +106,61 @@ class _AppShellState extends State<AppShell>
   void _afterPosting() {
     _createKey.currentState?.resetDraft();
     _homeKey.currentState?.refresh();
-    setState(() => _selectedIndex = 0);
-    _animateTabChange();
+    _selectPage(0);
   }
 
   void _showNotificationsPreview() {
     showNotificationsPreview(context, onViewAll: () => _selectPage(1));
   }
 
-  void _trackTabSwipe(DragUpdateDetails details) {
-    _tabSwipeDistance += details.primaryDelta ?? 0;
-  }
-
-  void _handleTabSwipe(DragEndDetails details) {
-    final velocity = details.primaryVelocity ?? 0;
-    final distance = _tabSwipeDistance;
-    _tabSwipeDistance = 0;
-    if (velocity.abs() < 360 && distance.abs() < 80) return;
-    final direction = velocity.abs() >= 360
-        ? (velocity.isNegative ? 1 : -1)
-        : (distance.isNegative ? 1 : -1);
-    final destination = (_selectedIndex + direction).clamp(0, 4).toInt();
-    if (destination != _selectedIndex) _selectPage(destination);
-  }
-
-  void _animateTabChange() {
-    if (MediaQuery.maybeOf(context)?.disableAnimations == true) {
-      _tabTransitionController.value = 1;
-      return;
+  void _trackPagePosition() {
+    final page = _pageController.page;
+    if (page != null && (page - _pagePosition.value).abs() > 0.001) {
+      _pagePosition.value = page;
     }
-    _tabTransitionController.forward(from: 0);
+  }
+
+  void _handlePageChanged(int index) {
+    if (_selectedIndex == index) return;
+    HapticFeedback.selectionClick();
+    setState(() => _selectedIndex = index);
+    if (index == 1) _inboxKey.currentState?.refresh();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      body: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onHorizontalDragUpdate: _trackTabSwipe,
-        onHorizontalDragEnd: _handleTabSwipe,
-        onHorizontalDragCancel: () => _tabSwipeDistance = 0,
-        child: DecoratedBox(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFFE4D4EC),
-                AppTheme.background,
-                Color(0xFFEDE3F2),
-              ],
-            ),
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Theme.of(context).colorScheme.primary.withValues(alpha: 0.16),
+              Theme.of(context).scaffoldBackgroundColor,
+              Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
+            ],
           ),
-          child: ScrollConfiguration(
-            behavior: const CozyScrollBehavior(),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 680),
-                child: FadeTransition(
-                  opacity: _tabOpacity,
-                  child: SlideTransition(
-                    position: _tabOffset,
-                    child: IndexedStack(
-                      index: _selectedIndex,
-                      children: List<Widget>.generate(
-                        _pages.length,
-                        (index) =>
-                            _pages[index] ??
-                            SizedBox.shrink(
-                              key: ValueKey<String>('unmounted-tab-$index'),
-                            ),
-                        growable: false,
-                      ),
-                    ),
+        ),
+        child: ScrollConfiguration(
+          behavior: const CozyScrollBehavior(),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 680),
+              child: AnimatedBuilder(
+                animation: _tapLift,
+                child: PageView(
+                  controller: _pageController,
+                  onPageChanged: _handlePageChanged,
+                  physics: const PageScrollPhysics(
+                    parent: ClampingScrollPhysics(),
                   ),
+                  children: _pages,
+                ),
+                builder: (context, child) => Transform.translate(
+                  offset: Offset(0, _tapLift.value),
+                  child: child,
                 ),
               ),
             ),
@@ -188,10 +171,14 @@ class _AppShellState extends State<AppShell>
         heightFactor: 1,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 680),
-          child: PremiumBottomNavigation(
-            selectedIndex: _selectedIndex,
-            showInboxBadge: AppScope.of(context).isLoggedIn,
-            onSelected: _selectPage,
+          child: ValueListenableBuilder<double>(
+            valueListenable: _pagePosition,
+            builder: (context, pagePosition, _) => PremiumBottomNavigation(
+              selectedIndex: _selectedIndex,
+              pagePosition: pagePosition,
+              showInboxBadge: false,
+              onSelected: _selectPage,
+            ),
           ),
         ),
       ),
@@ -203,11 +190,13 @@ class PremiumBottomNavigation extends StatelessWidget {
   const PremiumBottomNavigation({
     super.key,
     required this.selectedIndex,
+    required this.pagePosition,
     required this.onSelected,
     this.showInboxBadge = false,
   });
 
   final int selectedIndex;
+  final double pagePosition;
   final ValueChanged<int> onSelected;
   final bool showInboxBadge;
 
@@ -215,16 +204,36 @@ class PremiumBottomNavigation extends StatelessWidget {
   Widget build(BuildContext context) {
     final borderRadius = BorderRadius.circular(31);
     final highContrast = MediaQuery.maybeOf(context)?.highContrast ?? false;
-    final glassSurface = Container(
-      height: 80,
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final scheme = Theme.of(context).colorScheme;
+    final selectorPosition = pagePosition.clamp(0.0, 4.0).toDouble();
+    final postMorph = (1 - (selectorPosition - 2).abs())
+        .clamp(0.0, 1.0)
+        .toDouble();
+    final selectorWidth = 42 + (10 * postMorph);
+    final selectorHeight = 33 + (19 * postMorph);
+    final selectorTop = 20.4 - (9 * postMorph);
+    final glassSurface = AnimatedContainer(
+      duration: reduceMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 420),
+      curve: Curves.easeOutBack,
+      height: 94,
       padding: const EdgeInsets.symmetric(horizontal: 7),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: highContrast
-              ? const [Color(0xF23A2047), Color(0xF21E1029)]
-              : const [Color(0xD94A2858), Color(0xE3261432)],
+              ? [
+                  scheme.secondary,
+                  Color.lerp(scheme.secondary, Colors.black, 0.56)!,
+                ]
+              : [
+                  Color.lerp(scheme.secondary, scheme.primary, 0.2)!,
+                  Color.lerp(scheme.secondary, Colors.black, 0.5)!,
+                ],
           stops: const [0, 1],
         ),
         borderRadius: borderRadius,
@@ -236,6 +245,46 @@ class PremiumBottomNavigation extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
+          Positioned.fill(
+            child: IgnorePointer(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final itemWidth = constraints.maxWidth / 5;
+                  final selectorLeft =
+                      (itemWidth * (selectorPosition + 0.5)) -
+                      (selectorWidth / 2);
+                  return Stack(
+                    children: [
+                      Positioned(
+                        left: selectorLeft,
+                        top: selectorTop,
+                        child: Container(
+                          width: selectorWidth,
+                          height: selectorHeight,
+                          decoration: BoxDecoration(
+                            color: AppTheme.navigationOn,
+                            borderRadius: BorderRadius.circular(
+                              14 + (85 * postMorph),
+                            ),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.25),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: scheme.primary.withValues(alpha: 0.26),
+                                blurRadius: 18,
+                                spreadRadius: -3,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
           IgnorePointer(
             child: Align(
               alignment: Alignment.topCenter,
@@ -298,13 +347,6 @@ class PremiumBottomNavigation extends StatelessWidget {
         ],
       ),
     );
-    final filteredSurface = kIsWeb
-        ? glassSurface
-        : BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-            child: glassSurface,
-          );
-
     return SafeArea(
       minimum: const EdgeInsets.fromLTRB(14, 0, 14, 11),
       child: DecoratedBox(
@@ -325,7 +367,7 @@ class PremiumBottomNavigation extends StatelessWidget {
             ),
           ],
         ),
-        child: ClipRRect(borderRadius: borderRadius, child: filteredSurface),
+        child: ClipRRect(borderRadius: borderRadius, child: glassSurface),
       ),
     );
   }
@@ -361,87 +403,84 @@ class _NavigationItem extends StatelessWidget {
         selected: selected,
         button: true,
         label: label,
-        child: InkWell(
-          key: ValueKey('nav-${label.toLowerCase()}'),
-          onTap: onTap,
-          overlayColor: const WidgetStatePropertyAll<Color>(Colors.transparent),
-          borderRadius: BorderRadius.circular(18),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AnimatedSlide(
-                  duration: duration,
-                  curve: Curves.easeOutCubic,
-                  offset: selected ? const Offset(0, -0.06) : Offset.zero,
-                  child: AnimatedScale(
+        child: PremiumButtonMotion(
+          glowColor: primary,
+          pressScale: 1.1,
+          hoverScale: 1.06,
+          child: InkWell(
+            key: ValueKey('nav-${label.toLowerCase()}'),
+            onTap: onTap,
+            overlayColor: const WidgetStatePropertyAll<Color>(
+              Colors.transparent,
+            ),
+            borderRadius: BorderRadius.circular(18),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  AnimatedSlide(
                     duration: duration,
-                    curve: Curves.easeOutBack,
-                    scale: selected ? 1.04 : 1,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        AnimatedContainer(
-                          duration: duration,
-                          curve: Curves.easeOutCubic,
-                          width: selected ? 42 : 34,
-                          height: 33,
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? AppTheme.navigationOn
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(14),
-                            border: selected
-                                ? Border.all(
-                                    color: Colors.white.withValues(alpha: 0.25),
-                                  )
-                                : null,
+                    curve: Curves.easeOutCubic,
+                    offset: selected ? const Offset(0, -0.06) : Offset.zero,
+                    child: AnimatedScale(
+                      duration: duration,
+                      curve: Curves.easeOutBack,
+                      scale: selected ? 1.04 : 1,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          AnimatedContainer(
+                            duration: duration,
+                            curve: Curves.easeOutCubic,
+                            width: 42,
+                            height: 33,
+                            decoration: const BoxDecoration(),
+                            child: Icon(
+                              selected ? (selectedIcon ?? icon) : icon,
+                              size: 21,
+                              color: selected
+                                  ? primary
+                                  : AppTheme.navigationMuted,
+                            ),
                           ),
-                          child: Icon(
-                            selected ? (selectedIcon ?? icon) : icon,
-                            size: 21,
-                            color: selected
-                                ? primary
-                                : AppTheme.navigationMuted,
-                          ),
-                        ),
-                        if (badge)
-                          Positioned(
-                            right: -1,
-                            top: -2,
-                            child: Container(
-                              width: 9,
-                              height: 9,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF082A4),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: AppTheme.navigationPlum,
-                                  width: 1.5,
+                          if (badge)
+                            Positioned(
+                              right: -1,
+                              top: -2,
+                              child: Container(
+                                width: 9,
+                                height: 9,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF082A4),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: AppTheme.navigationPlum,
+                                    width: 1.5,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                AnimatedDefaultTextStyle(
-                  duration: duration,
-                  curve: Curves.easeOutCubic,
-                  style: TextStyle(
-                    color: selected
-                        ? AppTheme.navigationOn
-                        : AppTheme.navigationMuted,
-                    fontSize: 10.5,
-                    fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
-                    letterSpacing: selected ? -0.05 : 0,
+                  const SizedBox(height: 4),
+                  AnimatedDefaultTextStyle(
+                    duration: duration,
+                    curve: Curves.easeOutCubic,
+                    style: TextStyle(
+                      color: selected
+                          ? AppTheme.navigationOn
+                          : AppTheme.navigationMuted,
+                      fontSize: 10.5,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                      letterSpacing: selected ? -0.05 : 0,
+                    ),
+                    child: Text(label),
                   ),
-                  child: Text(label),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -469,68 +508,83 @@ class _PostNavigationItem extends StatelessWidget {
         selected: selected,
         button: true,
         label: 'Post',
-        child: InkWell(
-          key: const ValueKey('nav-post'),
-          onTap: onTap,
-          overlayColor: const WidgetStatePropertyAll<Color>(Colors.transparent),
-          customBorder: const CircleBorder(),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedSlide(
-                duration: duration,
-                curve: Curves.easeOutCubic,
-                offset: selected ? const Offset(0, -0.05) : Offset.zero,
-                child: AnimatedScale(
-                  scale: selected ? 1.06 : 1,
+        child: PremiumButtonMotion(
+          glowColor: scheme.primary,
+          pressScale: 1.1,
+          hoverScale: 1.06,
+          child: InkWell(
+            key: const ValueKey('nav-post'),
+            onTap: onTap,
+            overlayColor: const WidgetStatePropertyAll<Color>(
+              Colors.transparent,
+            ),
+            customBorder: const CircleBorder(),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedSlide(
                   duration: duration,
-                  curve: Curves.easeOutBack,
-                  child: AnimatedContainer(
+                  curve: Curves.easeOutCubic,
+                  offset: selected ? const Offset(0, -0.05) : Offset.zero,
+                  child: AnimatedScale(
+                    scale: 1,
                     duration: duration,
-                    curve: Curves.easeOutCubic,
-                    width: selected ? 52 : 49,
-                    height: selected ? 52 : 49,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [scheme.primary, scheme.secondary],
-                      ),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppTheme.navigationOn,
-                        width: 3.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: scheme.primary.withValues(alpha: 0.4),
-                          blurRadius: selected ? 17 : 12,
-                          offset: const Offset(0, 7),
+                    curve: Curves.easeOutBack,
+                    child: SizedBox(
+                      width: 52,
+                      height: 52,
+                      child: Center(
+                        child: AnimatedContainer(
+                          duration: duration,
+                          curve: Curves.easeOutCubic,
+                          width: selected ? 44 : 49,
+                          height: selected ? 44 : 49,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [scheme.primary, scheme.secondary],
+                            ),
+                            shape: BoxShape.circle,
+                            border: selected
+                                ? null
+                                : Border.all(
+                                    color: AppTheme.navigationOn,
+                                    width: 3.5,
+                                  ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: scheme.primary.withValues(alpha: 0.4),
+                                blurRadius: selected ? 17 : 12,
+                                offset: const Offset(0, 7),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            selected ? Icons.edit_rounded : Icons.add_rounded,
+                            color: Colors.white,
+                            size: 24,
+                          ),
                         ),
-                      ],
-                    ),
-                    child: Icon(
-                      selected ? Icons.edit_rounded : Icons.add_rounded,
-                      color: Colors.white,
-                      size: 24,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              AnimatedDefaultTextStyle(
-                duration: duration,
-                curve: Curves.easeOutCubic,
-                style: TextStyle(
-                  color: selected
-                      ? AppTheme.navigationOn
-                      : AppTheme.navigationMuted,
-                  fontSize: 10.5,
-                  fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                const SizedBox(height: 2),
+                AnimatedDefaultTextStyle(
+                  duration: duration,
+                  curve: Curves.easeOutCubic,
+                  style: TextStyle(
+                    color: selected
+                        ? AppTheme.navigationOn
+                        : AppTheme.navigationMuted,
+                    fontSize: 10.5,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                  ),
+                  child: const Text('Post'),
                 ),
-                child: const Text('Post'),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

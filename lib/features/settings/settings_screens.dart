@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_controller.dart';
 import '../../core/app_models.dart';
@@ -19,11 +18,17 @@ Future<void> openMoreMenu(BuildContext context) async {
     context: context,
     useSafeArea: true,
     isScrollControlled: true,
+    showDragHandle: false,
     backgroundColor: Colors.transparent,
+    barrierColor: const Color(0x3B180D20),
     builder: (sheetContext) {
       void open(Widget page) {
         Navigator.of(sheetContext).pop();
-        navigator.push(MaterialPageRoute<void>(builder: (_) => page));
+        navigator
+            .push(MaterialPageRoute<void>(builder: (_) => page))
+            .whenComplete(() {
+              if (navigator.mounted) openMoreMenu(navigator.context);
+            });
       }
 
       return Container(
@@ -31,11 +36,8 @@ Future<void> openMoreMenu(BuildContext context) async {
           maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.88,
         ),
         decoration: BoxDecoration(
-          color: AppTheme.background.withValues(alpha: 0.96),
+          color: Theme.of(sheetContext).scaffoldBackgroundColor,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-          border: Border(
-            top: BorderSide(color: Colors.white.withValues(alpha: 0.62)),
-          ),
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -482,7 +484,7 @@ class ResourcesScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: () => _launchExternal(
+                      onPressed: () => openExternalUri(
                         context,
                         Uri(scheme: 'tel', path: '988'),
                       ),
@@ -497,7 +499,7 @@ class ResourcesScreen extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: () => _launchExternal(
+                      onPressed: () => openExternalUri(
                         context,
                         Uri(scheme: 'sms', path: '988'),
                       ),
@@ -521,7 +523,7 @@ class ResourcesScreen extends StatelessWidget {
             icon: Icons.language_rounded,
             title: 'Visit the official 9-8-8 website',
             subtitle: 'Learn what to expect and find more information.',
-            onTap: () => _launchExternal(context, Uri.parse('https://988.ca/')),
+            onTap: () => openExternalUri(context, Uri.parse('https://988.ca/')),
           ),
         ),
         const SizedBox(height: 20),
@@ -889,7 +891,7 @@ class LegalScreen extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         OutlinedButton.icon(
-          onPressed: () => _launchExternal(context, pageUri),
+          onPressed: () => openExternalUri(context, pageUri),
           icon: const Icon(Icons.open_in_new_rounded),
           label: Text(
             privacy
@@ -978,14 +980,14 @@ class TeamScreen extends StatelessWidget {
         const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: () =>
-              _launchExternal(context, Uri.parse('https://umbrella4u.ca/team')),
+              openExternalUri(context, Uri.parse('https://umbrella4u.ca/team')),
           icon: const Icon(Icons.open_in_new_rounded),
           label: const Text('Read the full team bios'),
         ),
         const SizedBox(height: 12),
         TextButton.icon(
           onPressed: () =>
-              _launchExternal(context, Uri.parse('https://umbrella4u.ca/')),
+              openExternalUri(context, Uri.parse('https://umbrella4u.ca/')),
           icon: const Icon(Icons.language_rounded),
           label: const Text('Visit umbrella4u.ca'),
         ),
@@ -1064,27 +1066,6 @@ const _termsSections = <(String, String)>[
   ),
 ];
 
-Future<void> _launchExternal(BuildContext context, Uri uri) async {
-  try {
-    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!launched && context.mounted) {
-      showAppMessage(
-        context,
-        'This action is not available on this device.',
-        error: true,
-      );
-    }
-  } catch (_) {
-    if (context.mounted) {
-      showAppMessage(
-        context,
-        'This action is not available on this device.',
-        error: true,
-      );
-    }
-  }
-}
-
 class _DetailScaffold extends StatelessWidget {
   const _DetailScaffold({
     required this.title,
@@ -1120,11 +1101,11 @@ class _DetailScaffold extends StatelessWidget {
 
     return SwipeBackScope(
       child: Scaffold(
-        backgroundColor: AppTheme.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
           title: Text(title),
           centerTitle: false,
-          backgroundColor: AppTheme.background,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           foregroundColor: AppTheme.ink,
           surfaceTintColor: Colors.transparent,
           elevation: 0,

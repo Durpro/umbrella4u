@@ -16,7 +16,9 @@ class AppController extends ChangeNotifier {
   bool _guestMode = false;
   bool _loadingProfile = false;
   bool _passwordRecovery = false;
+  bool _offline = false;
   UserProfile? _profile;
+  Object? _profileError;
   AppThemeChoice _theme = appThemeChoices.first;
 
   bool get ready => _ready;
@@ -24,31 +26,49 @@ class AppController extends ChangeNotifier {
   bool get isLoggedIn => repository.currentUser != null;
   bool get isDemo => !repository.isLive;
   UserProfile? get profile => _profile;
+  Object? get profileError => _profileError;
   AppThemeChoice get theme => _theme;
   bool get passwordRecovery => _passwordRecovery;
+  bool get offline => _offline;
+
+  // A profile that failed to load is not the same as a profile that does not
+  // exist yet. Without that distinction a dropped connection would send an
+  // established member back through onboarding.
   bool get needsOnboarding =>
-      isLoggedIn && !_loadingProfile && (_profile?.onboarded != true);
+      isLoggedIn &&
+      !_loadingProfile &&
+      _profileError == null &&
+      (_profile?.onboarded != true);
 
   Future<void> start() async {
-    if (repository.isLive) {
-      _authSubscription = repository.authChanges.listen((state) async {
-        if (state.event == AuthChangeEvent.passwordRecovery) {
-          _passwordRecovery = true;
-        }
-        if (state.session?.user == null) {
-          _profile = null;
-          _guestMode = false;
-          notifyListeners();
-          return;
-        }
-        await refreshProfile();
-      });
-      if (isLoggedIn) await refreshProfile(notify: false);
-    } else {
-      _guestMode = true;
+    try {
+      if (repository.isLive) {
+        _authSubscription = repository.authChanges.listen((state) async {
+          if (state.event == AuthChangeEvent.passwordRecovery) {
+            _passwordRecovery = true;
+          }
+          if (state.session?.user == null) {
+            _profile = null;
+            _profileError = null;
+            _guestMode = false;
+            notifyListeners();
+            return;
+          }
+          await refreshProfile();
+        });
+        if (isLoggedIn) await refreshProfile(notify: false);
+      } else {
+        _guestMode = true;
+      }
+    } catch (error) {
+      // Startup must always finish. Anything else leaves the launch screen up
+      // forever, because `ready` is what swaps it out.
+      _profileError = error;
+      reportRequestFailure(error);
+    } finally {
+      _ready = true;
+      notifyListeners();
     }
-    _ready = true;
-    notifyListeners();
   }
 
   void browseAsGuest() {
@@ -89,6 +109,7 @@ class AppController extends ChangeNotifier {
   Future<void> refreshProfile({bool notify = true}) async {
     if (!isLoggedIn) {
       _profile = null;
+      _profileError = null;
       if (notify) notifyListeners();
       return;
     }
@@ -96,6 +117,7 @@ class AppController extends ChangeNotifier {
     if (notify) notifyListeners();
     try {
       _profile = await repository.fetchCurrentProfile();
+      _profileError = null;
       final profileAccent = _profile?.accentColor.toLowerCase();
       if (profileAccent != null) {
         _theme = appThemeChoices.firstWhere(
@@ -105,6 +127,11 @@ class AppController extends ChangeNotifier {
           orElse: () => _theme,
         );
       }
+    } catch (error) {
+      // Recorded rather than thrown: this runs from startup and from the auth
+      // stream, where an exception would go unhandled and strand the app.
+      _profileError = error;
+      reportRequestFailure(error);
     } finally {
       _loadingProfile = false;
       if (notify) notifyListeners();
@@ -165,8 +192,21 @@ class AppController extends ChangeNotifier {
   Future<void> signOut() async {
     await repository.signOut();
     _profile = null;
+    _profileError = null;
     _guestMode = false;
     _passwordRecovery = false;
+    notifyListeners();
+  }
+
+  void reportRequestSuccess() {
+    if (!_offline) return;
+    _offline = false;
+    notifyListeners();
+  }
+
+  void reportRequestFailure(Object error) {
+    if (_offline || !isNetworkError(error)) return;
+    _offline = true;
     notifyListeners();
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/app_controller.dart';
 import '../../core/app_models.dart';
@@ -114,51 +115,63 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                 SizedBox(
                   width: double.infinity,
-                  child: FilledButton(
-                    onPressed: controller.isDemo
-                        ? null
-                        : () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const SignupScreen(),
+                  child: PremiumButtonMotion(
+                    enabled: !controller.isDemo,
+                    child: FilledButton(
+                      onPressed: controller.isDemo
+                          ? null
+                          : () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const SignupScreen(),
+                              ),
                             ),
-                          ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Theme.of(context).colorScheme.secondary,
-                    ),
-                    child: const Text('Create an account'),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: controller.isDemo
-                        ? null
-                        : () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const LoginScreen(),
-                            ),
-                          ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.45),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Theme.of(
+                          context,
+                        ).colorScheme.secondary,
                       ),
+                      child: const Text('Create an account'),
                     ),
-                    child: const Text('Log in'),
                   ),
                 ),
                 const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
-                  child: TextButton(
-                    onPressed: controller.browseAsGuest,
-                    style: TextButton.styleFrom(foregroundColor: Colors.white),
-                    child: Text(
-                      controller.isDemo
-                          ? 'Explore the full preview'
-                          : 'Browse as a guest',
+                  child: PremiumButtonMotion(
+                    enabled: !controller.isDemo,
+                    child: OutlinedButton(
+                      onPressed: controller.isDemo
+                          ? null
+                          : () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const LoginScreen(),
+                              ),
+                            ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.45),
+                        ),
+                      ),
+                      child: const Text('Log in'),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: PremiumButtonMotion(
+                    child: TextButton(
+                      onPressed: controller.browseAsGuest,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text(
+                        controller.isDemo
+                            ? 'Explore the full preview'
+                            : 'Browse as a guest',
+                      ),
                     ),
                   ),
                 ),
@@ -208,8 +221,10 @@ class _LoginScreenState extends State<LoginScreen> {
         context,
       ).signIn(email: _email.text.trim(), password: _password.text);
       if (!mounted) return;
+      TextInput.finishAutofillContext();
       Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (error) {
+      AppScope.of(context).reportRequestFailure(error);
       if (mounted) showAppMessage(context, friendlyError(error), error: true);
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -263,41 +278,48 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 18),
             SizedBox(
               width: double.infinity,
-              child: FilledButton(
-                onPressed: _busy ? null : _submit,
-                child: _busy
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CupertinoActivityIndicator(
-                          color: Colors.white,
-                          radius: 10,
-                        ),
-                      )
-                    : const Text('Log in'),
+              child: PremiumButtonMotion(
+                enabled: !_busy,
+                child: FilledButton(
+                  onPressed: _busy ? null : _submit,
+                  child: _busy
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CupertinoActivityIndicator(
+                            color: Colors.white,
+                            radius: 10,
+                          ),
+                        )
+                      : const Text('Log in'),
+                ),
               ),
             ),
             const SizedBox(height: 8),
-            TextButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const ForgotPasswordScreen(),
+            PremiumButtonMotion(
+              child: TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ForgotPasswordScreen(),
+                  ),
                 ),
+                child: const Text('Forgot your password?'),
               ),
-              child: const Text('Forgot your password?'),
             ),
             const Divider(height: 30),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Text('New here?'),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pushReplacement(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const SignupScreen(),
+                PremiumButtonMotion(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pushReplacement(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const SignupScreen(),
+                      ),
                     ),
+                    child: const Text('Create an account'),
                   ),
-                  child: const Text('Create an account'),
                 ),
               ],
             ),
@@ -346,6 +368,7 @@ class _SignupScreenState extends State<SignupScreen> {
         context,
       ).signUp(email: _email.text.trim(), password: _password.text);
       if (!mounted) return;
+      TextInput.finishAutofillContext(shouldSave: true);
       if (signedIn) {
         Navigator.of(context).popUntil((route) => route.isFirst);
       } else {
@@ -377,6 +400,7 @@ class _SignupScreenState extends State<SignupScreen> {
         );
       }
     } catch (error) {
+      AppScope.of(context).reportRequestFailure(error);
       if (mounted) showAppMessage(context, friendlyError(error), error: true);
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -397,7 +421,7 @@ class _SignupScreenState extends State<SignupScreen> {
               controller: _email,
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
-              autofillHints: const [AutofillHints.newUsername],
+              autofillHints: const [AutofillHints.email],
               decoration: const InputDecoration(
                 labelText: 'Email',
                 prefixIcon: Icon(Icons.alternate_email_rounded),
@@ -442,18 +466,21 @@ class _SignupScreenState extends State<SignupScreen> {
             const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
-              child: FilledButton(
-                onPressed: _busy || !_agree ? null : _submit,
-                child: _busy
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CupertinoActivityIndicator(
-                          color: Colors.white,
-                          radius: 10,
-                        ),
-                      )
-                    : const Text('Create account'),
+              child: PremiumButtonMotion(
+                enabled: !_busy && _agree,
+                child: FilledButton(
+                  onPressed: _busy || !_agree ? null : _submit,
+                  child: _busy
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CupertinoActivityIndicator(
+                            color: Colors.white,
+                            radius: 10,
+                          ),
+                        )
+                      : const Text('Create account'),
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -461,13 +488,15 @@ class _SignupScreenState extends State<SignupScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Text('Already a member?'),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pushReplacement(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const LoginScreen(),
+                PremiumButtonMotion(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pushReplacement(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const LoginScreen(),
+                      ),
                     ),
+                    child: const Text('Log in'),
                   ),
-                  child: const Text('Log in'),
                 ),
               ],
             ),
@@ -537,9 +566,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _busy ? null : _send,
-                    child: Text(_busy ? 'Sending…' : 'Send recovery link'),
+                  child: PremiumButtonMotion(
+                    enabled: !_busy,
+                    child: FilledButton(
+                      onPressed: _busy ? null : _send,
+                      child: Text(_busy ? 'Sending…' : 'Send recovery link'),
+                    ),
                   ),
                 ),
               ],
@@ -631,18 +663,21 @@ class _SetNewPasswordScreenState extends State<SetNewPasswordScreen> {
             const SizedBox(height: 18),
             SizedBox(
               width: double.infinity,
-              child: FilledButton(
-                onPressed: _busy ? null : _save,
-                child: _busy
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CupertinoActivityIndicator(
-                          color: Colors.white,
-                          radius: 10,
-                        ),
-                      )
-                    : const Text('Save new password'),
+              child: PremiumButtonMotion(
+                enabled: !_busy,
+                child: FilledButton(
+                  onPressed: _busy ? null : _save,
+                  child: _busy
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CupertinoActivityIndicator(
+                            color: Colors.white,
+                            radius: 10,
+                          ),
+                        )
+                      : const Text('Save new password'),
+                ),
               ),
             ),
           ],
@@ -1003,23 +1038,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: Row(
                 children: [
                   if (_page > 0)
-                    OutlinedButton(
-                      onPressed: () => _pageController.previousPage(
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOut,
+                    PremiumButtonMotion(
+                      child: OutlinedButton(
+                        onPressed: () => _pageController.previousPage(
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeOut,
+                        ),
+                        child: const Text('Back'),
                       ),
-                      child: const Text('Back'),
                     ),
                   if (_page > 0) const SizedBox(width: 10),
                   Expanded(
-                    child: FilledButton(
-                      onPressed: _busy ? null : _next,
-                      child: Text(
-                        _busy
-                            ? 'Saving…'
-                            : _page == 3
-                            ? 'Enter Haven'
-                            : 'Continue',
+                    child: PremiumButtonMotion(
+                      enabled: !_busy,
+                      child: FilledButton(
+                        onPressed: _busy ? null : _next,
+                        child: Text(
+                          _busy
+                              ? 'Saving…'
+                              : _page == 3
+                              ? 'Enter Haven'
+                              : 'Continue',
+                        ),
                       ),
                     ),
                   ),
@@ -1031,6 +1071,109 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
     );
   }
+}
+
+class _Rainfall extends StatefulWidget {
+  const _Rainfall({
+    this.color = Colors.white,
+    this.opacity = 0.16,
+    this.dropCount = 22,
+    this.dropLength = 15,
+  });
+
+  final Color color;
+  final double opacity;
+  final int dropCount;
+  final double dropLength;
+
+  @override
+  State<_Rainfall> createState() => _RainfallState();
+}
+
+class _RainfallState extends State<_Rainfall>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  bool? _lastReducedMotion;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 8),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (_lastReducedMotion == reduceMotion) return;
+    _lastReducedMotion = reduceMotion;
+    if (reduceMotion) {
+      _controller.stop();
+      _controller.value = 0;
+    } else {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _RainPainter(
+        animation: _controller,
+        color: widget.color,
+        opacity: widget.opacity,
+        dropCount: widget.dropCount,
+        dropLength: widget.dropLength,
+      ),
+      child: const SizedBox.expand(),
+    );
+  }
+}
+
+class _RainPainter extends CustomPainter {
+  _RainPainter({
+    required this.animation,
+    required this.color,
+    required this.opacity,
+    required this.dropCount,
+    required this.dropLength,
+  }) : super(repaint: animation);
+
+  final Animation<double> animation;
+  final Color color;
+  final double opacity;
+  final int dropCount;
+  final double dropLength;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final paint = Paint()
+      ..color = color.withValues(alpha: opacity)
+      ..strokeWidth = 1
+      ..strokeCap = StrokeCap.round;
+    final progress = animation.value;
+    for (var index = 0; index < dropCount; index++) {
+      final xRatio = ((index * 47) % 101) / 100;
+      final startRatio = ((index * 71) % 113) / 100;
+      final yRatio = ((startRatio + progress * 1.25) % 1.18) - 0.12;
+      final start = Offset(xRatio * size.width, yRatio * size.height);
+      canvas.drawLine(start, start + Offset(-2.5, dropLength), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RainPainter oldDelegate) => false;
 }
 
 class _AuthScaffold extends StatelessWidget {
@@ -1053,6 +1196,11 @@ class _AuthScaffold extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
+            const Positioned.fill(
+              child: IgnorePointer(
+                child: _Rainfall(opacity: 0.15, dropCount: 26),
+              ),
+            ),
             const Positioned(
               right: -116,
               top: -124,
@@ -1127,82 +1275,96 @@ class _LightAuthScaffold extends StatelessWidget {
           surfaceTintColor: Colors.transparent,
           automaticallyImplyLeading: canGoBack,
         ),
-        body: SafeArea(
-          top: false,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(22, 10, 22, 30),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                EntranceReveal(
-                  duration: const Duration(milliseconds: 350),
-                  slideFrom: const Offset(0, -0.015),
-                  scaleFrom: 0.996,
-                  child: const BrandMark(size: 42),
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: IgnorePointer(
+                child: _Rainfall(
+                  color: Theme.of(context).colorScheme.primary,
+                  opacity: 0.08,
+                  dropCount: 18,
+                  dropLength: 12,
                 ),
-                const SizedBox(height: 36),
-                EntranceReveal(
-                  delay: const Duration(milliseconds: 45),
-                  duration: const Duration(milliseconds: 400),
-                  slideFrom: const Offset(0, 0.024),
-                  scaleFrom: 0.995,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        subtitle,
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 28),
-                EntranceReveal(
-                  delay: const Duration(milliseconds: 105),
-                  duration: const Duration(milliseconds: 440),
-                  slideFrom: const Offset(0, 0.032),
-                  scaleFrom: 0.988,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: highContrast
-                            ? const [Color(0xFFFFFFFF), Color(0xFFF9F6FD)]
-                            : [
-                                Colors.white.withValues(alpha: 0.9),
-                                Colors.white.withValues(alpha: 0.74),
-                              ],
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: highContrast
-                            ? AppTheme.border
-                            : Colors.white.withValues(alpha: 0.78),
-                        width: 0.9,
-                      ),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x1241237B),
-                          blurRadius: 26,
-                          spreadRadius: -3,
-                          offset: Offset(0, 11),
-                        ),
-                      ],
-                    ),
-                    child: child,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+            SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(22, 10, 22, 30),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    EntranceReveal(
+                      duration: const Duration(milliseconds: 350),
+                      slideFrom: const Offset(0, -0.015),
+                      scaleFrom: 0.996,
+                      child: const BrandMark(size: 42),
+                    ),
+                    const SizedBox(height: 36),
+                    EntranceReveal(
+                      delay: const Duration(milliseconds: 45),
+                      duration: const Duration(milliseconds: 400),
+                      slideFrom: const Offset(0, 0.024),
+                      scaleFrom: 0.995,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: Theme.of(context).textTheme.headlineMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            subtitle,
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    EntranceReveal(
+                      delay: const Duration(milliseconds: 105),
+                      duration: const Duration(milliseconds: 440),
+                      slideFrom: const Offset(0, 0.032),
+                      scaleFrom: 0.988,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: highContrast
+                                ? const [Color(0xFFFFFFFF), Color(0xFFF9F6FD)]
+                                : [
+                                    Colors.white.withValues(alpha: 0.9),
+                                    Colors.white.withValues(alpha: 0.74),
+                                  ],
+                          ),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: highContrast
+                                ? AppTheme.border
+                                : Colors.white.withValues(alpha: 0.78),
+                            width: 0.9,
+                          ),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x1241237B),
+                              blurRadius: 26,
+                              spreadRadius: -3,
+                              offset: Offset(0, 11),
+                            ),
+                          ],
+                        ),
+                        child: child,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
