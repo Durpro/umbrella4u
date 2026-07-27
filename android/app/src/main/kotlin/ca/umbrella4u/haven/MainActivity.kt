@@ -1,4 +1,4 @@
-package com.example.umbrella4u
+package ca.umbrella4u.haven
 
 import io.flutter.embedding.android.FlutterActivity
 

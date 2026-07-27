@@ -1,11 +1,11 @@
 {
-    "name": "umbrella4u",
-    "short_name": "umbrella4u",
+    "name": "Haven — Umbrella4U",
+    "short_name": "Haven",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#E9DDF0",
+    "theme_color": "#75558F",
+    "description": "A kinder peer-support community by Umbrella4U.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
