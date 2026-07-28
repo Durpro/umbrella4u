@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -359,7 +360,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final List<String> _tags = [];
   bool _initialized = false;
   bool _busy = false;
+  bool _saved = false;
   String _avatar = '☂️';
+
+  // What the form was seeded with, so an exit can tell an edited profile from
+  // an untouched one.
+  UserProfile? _source;
+  String _initialAvatar = '☂️';
+  List<String> _initialTags = const [];
 
   @override
   void didChangeDependencies() {
@@ -377,6 +385,60 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _avatar = profile.avatarUrl.startsWith('emoji:')
         ? profile.avatarUrl.substring(6)
         : profile.avatarText;
+
+    _source = profile;
+    _initialAvatar = _avatar;
+    _initialTags = List<String>.unmodifiable(_tags);
+  }
+
+  bool get _hasUnsavedChanges {
+    final profile = _source;
+    if (profile == null || _saved) return false;
+    return _displayName.text.trim() != profile.displayName.trim() ||
+        _username.text.trim().toLowerCase() !=
+            profile.username.trim().toLowerCase() ||
+        _pronouns.text.trim() != profile.pronouns.trim() ||
+        _status.text.trim() != profile.statusWeather.trim() ||
+        _about.text.trim() != profile.aboutMe.trim() ||
+        _avatar != _initialAvatar ||
+        _tagInput.text.trim().isNotEmpty ||
+        !listEquals(_tags, _initialTags);
+  }
+
+  Future<void> _handlePop(bool didPop) async {
+    if (didPop || _busy) return;
+    if (!_hasUnsavedChanges) {
+      Navigator.of(context).pop();
+      return;
+    }
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: Icon(
+          Icons.edit_off_outlined,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+        title: const Text('Leave without saving?'),
+        content: const Text(
+          'Your profile changes have not been saved yet. They will be lost if '
+          'you leave now.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Keep editing'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFC33E55),
+            ),
+            child: const Text('Discard changes'),
+          ),
+        ],
+      ),
+    );
+    if (discard == true && mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -418,6 +480,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'tags': List<String>.unmodifiable(_tags),
       });
       if (!mounted) return;
+      // The form now matches what is stored, so leaving must not prompt.
+      _saved = true;
       showAppMessage(context, 'Your profile is saved.');
       Navigator.of(context).pop(true);
     } catch (error) {
@@ -430,201 +494,210 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final profile = widget.profile ?? AppScope.of(context).profile;
-    return SwipeBackScope(
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Edit profile'),
-          backgroundColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
-        ),
-        body: profile == null
-            ? ListView(
-                padding: const EdgeInsets.fromLTRB(20, 26, 20, 40),
-                children: [
-                  EmptyState(
-                    icon: Icons.person_off_outlined,
-                    title: 'Log in to edit your profile',
-                    message:
-                        'Your profile details are available after you log in.',
-                    action: () => requireMember(context),
-                    actionLabel: 'Log in',
-                  ),
-                ],
-              )
-            : Form(
-                key: _formKey,
-                child: ListView(
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 48),
+    // Every way out of the editor — the app bar arrow, the system back
+    // gesture, and SwipeBackScope — routes through maybePop, so guarding it
+    // here covers all of them. `canPop` stays false rather than tracking the
+    // form, which would mean rebuilding this list on every keystroke.
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) => _handlePop(didPop),
+      child: SwipeBackScope(
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Edit profile'),
+            backgroundColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+          ),
+          body: profile == null
+              ? ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 26, 20, 40),
                   children: [
-                    _EditorIntro(profile: profile, avatar: _avatar),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Choose an avatar',
-                      style: Theme.of(context).textTheme.titleMedium,
+                    EmptyState(
+                      icon: Icons.person_off_outlined,
+                      title: 'Log in to edit your profile',
+                      message:
+                          'Your profile details are available after you log in.',
+                      action: () => requireMember(context),
+                      actionLabel: 'Log in',
                     ),
-                    const SizedBox(height: 11),
-                    Wrap(
-                      spacing: 9,
-                      runSpacing: 9,
-                      children: _avatars
-                          .map(
-                            (emoji) => _AvatarChoice(
-                              emoji: emoji,
-                              selected: emoji == _avatar,
-                              onTap: () => setState(() => _avatar = emoji),
-                            ),
-                          )
-                          .toList(growable: false),
-                    ),
-                    const SizedBox(height: 24),
-                    TextFormField(
-                      controller: _displayName,
-                      maxLength: 30,
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'Display name',
-                        hintText: 'How you want to appear',
-                        prefixIcon: Icon(Icons.badge_outlined),
+                  ],
+                )
+              : Form(
+                  key: _formKey,
+                  child: ListView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 48),
+                    children: [
+                      _EditorIntro(profile: profile, avatar: _avatar),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Choose an avatar',
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      validator: (value) =>
-                          value!.trim().isEmpty ? 'Add a display name.' : null,
-                    ),
-                    const SizedBox(height: 11),
-                    TextFormField(
-                      controller: _username,
-                      maxLength: 24,
-                      textCapitalization: TextCapitalization.none,
-                      textInputAction: TextInputAction.next,
-                      autocorrect: false,
-                      enableSuggestions: false,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(
-                          RegExp(r'[A-Za-z0-9_]'),
-                        ),
-                      ],
-                      decoration: const InputDecoration(
-                        labelText: 'Username',
-                        hintText: 'quiet_fern',
-                        prefixIcon: Icon(Icons.alternate_email_rounded),
-                      ),
-                      validator: (value) => _validUsername(value ?? '')
-                          ? null
-                          : 'Use 3–24 letters, numbers, or underscores.',
-                    ),
-                    const SizedBox(height: 11),
-                    TextFormField(
-                      controller: _pronouns,
-                      maxLength: 30,
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'Pronouns',
-                        hintText: 'Optional',
-                        prefixIcon: Icon(Icons.chat_bubble_outline_rounded),
-                      ),
-                    ),
-                    const SizedBox(height: 11),
-                    TextFormField(
-                      controller: _status,
-                      maxLength: 60,
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'Today’s weather',
-                        hintText: '🌤️ better than yesterday',
-                        prefixIcon: Icon(Icons.wb_cloudy_outlined),
-                      ),
-                    ),
-                    const SizedBox(height: 11),
-                    TextFormField(
-                      controller: _about,
-                      minLines: 4,
-                      maxLines: 7,
-                      maxLength: 300,
-                      decoration: const InputDecoration(
-                        labelText: 'About you',
-                        hintText:
-                            'Share a little without using your real name, school, address, or contact details.',
-                        alignLabelWithHint: true,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    _PrivacyReminder(),
-                    const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Interests',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                        ),
-                        Text(
-                          '${_tags.length}/8',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    if (_tags.isNotEmpty)
+                      const SizedBox(height: 11),
                       Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _tags
+                        spacing: 9,
+                        runSpacing: 9,
+                        children: _avatars
                             .map(
-                              (tag) => InputChip(
-                                label: Text('#$tag'),
-                                onDeleted: _busy
-                                    ? null
-                                    : () => setState(() => _tags.remove(tag)),
+                              (emoji) => _AvatarChoice(
+                                emoji: emoji,
+                                selected: emoji == _avatar,
+                                onTap: () => setState(() => _avatar = emoji),
                               ),
                             )
                             .toList(growable: false),
                       ),
-                    if (_tags.isNotEmpty) const SizedBox(height: 11),
-                    TextField(
-                      controller: _tagInput,
-                      enabled: _tags.length < 8 && !_busy,
-                      maxLength: 20,
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => _addTag(),
-                      decoration: InputDecoration(
-                        labelText: _tags.length >= 8
-                            ? 'Eight interests added'
-                            : 'Add an interest',
-                        hintText: 'music, art, studying…',
-                        prefixIcon: const Icon(Icons.tag_rounded),
-                        suffixIcon: IconButton(
-                          onPressed: _tags.length < 8 && !_busy
-                              ? _addTag
-                              : null,
-                          icon: const Icon(Icons.add_circle_outline_rounded),
-                          tooltip: 'Add tag',
+                      const SizedBox(height: 24),
+                      TextFormField(
+                        controller: _displayName,
+                        maxLength: 30,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: 'Display name',
+                          hintText: 'How you want to appear',
+                          prefixIcon: Icon(Icons.badge_outlined),
+                        ),
+                        validator: (value) => value!.trim().isEmpty
+                            ? 'Add a display name.'
+                            : null,
+                      ),
+                      const SizedBox(height: 11),
+                      TextFormField(
+                        controller: _username,
+                        maxLength: 24,
+                        textCapitalization: TextCapitalization.none,
+                        textInputAction: TextInputAction.next,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'[A-Za-z0-9_]'),
+                          ),
+                        ],
+                        decoration: const InputDecoration(
+                          labelText: 'Username',
+                          hintText: 'quiet_fern',
+                          prefixIcon: Icon(Icons.alternate_email_rounded),
+                        ),
+                        validator: (value) => _validUsername(value ?? '')
+                            ? null
+                            : 'Use 3–24 letters, numbers, or underscores.',
+                      ),
+                      const SizedBox(height: 11),
+                      TextFormField(
+                        controller: _pronouns,
+                        maxLength: 30,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: 'Pronouns',
+                          hintText: 'Optional',
+                          prefixIcon: Icon(Icons.chat_bubble_outline_rounded),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 22),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: _busy ? null : _save,
-                        icon: _busy
-                            ? const SizedBox(
-                                width: 19,
-                                height: 19,
-                                child: CupertinoActivityIndicator(
-                                  radius: 9,
-                                  color: Colors.white,
+                      const SizedBox(height: 11),
+                      TextFormField(
+                        controller: _status,
+                        maxLength: 60,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: 'Today’s weather',
+                          hintText: '🌤️ better than yesterday',
+                          prefixIcon: Icon(Icons.wb_cloudy_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: 11),
+                      TextFormField(
+                        controller: _about,
+                        minLines: 4,
+                        maxLines: 7,
+                        maxLength: 300,
+                        decoration: const InputDecoration(
+                          labelText: 'About you',
+                          hintText:
+                              'Share a little without using your real name, school, address, or contact details.',
+                          alignLabelWithHint: true,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      _PrivacyReminder(),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Interests',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ),
+                          Text(
+                            '${_tags.length}/8',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      if (_tags.isNotEmpty)
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _tags
+                              .map(
+                                (tag) => InputChip(
+                                  label: Text('#$tag'),
+                                  onDeleted: _busy
+                                      ? null
+                                      : () => setState(() => _tags.remove(tag)),
                                 ),
                               )
-                            : const Icon(Icons.check_rounded),
-                        label: Text(_busy ? 'Saving…' : 'Save profile'),
+                              .toList(growable: false),
+                        ),
+                      if (_tags.isNotEmpty) const SizedBox(height: 11),
+                      TextField(
+                        controller: _tagInput,
+                        enabled: _tags.length < 8 && !_busy,
+                        maxLength: 20,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => _addTag(),
+                        decoration: InputDecoration(
+                          labelText: _tags.length >= 8
+                              ? 'Eight interests added'
+                              : 'Add an interest',
+                          hintText: 'music, art, studying…',
+                          prefixIcon: const Icon(Icons.tag_rounded),
+                          suffixIcon: IconButton(
+                            onPressed: _tags.length < 8 && !_busy
+                                ? _addTag
+                                : null,
+                            icon: const Icon(Icons.add_circle_outline_rounded),
+                            tooltip: 'Add tag',
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 22),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: _busy ? null : _save,
+                          icon: _busy
+                              ? const SizedBox(
+                                  width: 19,
+                                  height: 19,
+                                  child: CupertinoActivityIndicator(
+                                    radius: 9,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.check_rounded),
+                          label: Text(_busy ? 'Saving…' : 'Save profile'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+        ),
       ),
     );
   }
