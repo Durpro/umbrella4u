@@ -84,6 +84,30 @@ class UmbrellaRepository {
     await _client?.auth.signOut(scope: SignOutScope.global);
   }
 
+  /// Erases the member's content and their login for good.
+  ///
+  /// Removing a login needs the service-role key, which can never ship inside
+  /// an app, so this asks the `delete-account` edge function to do it. That
+  /// function reads who is calling from their own token — the id is never sent
+  /// from here, so it cannot be pointed at somebody else.
+  Future<void> deleteAccount() async {
+    final client = _requireClient();
+    _requireUser();
+    try {
+      await client.functions.invoke('delete-account');
+    } on FunctionException catch (_) {
+      throw const AppException(
+        'Your account could not be deleted right now. Please try again, or '
+        'reach the team through umbrella4u.ca.',
+      );
+    }
+    // The login is gone, so asking the server to end the session would be
+    // refused. Clearing it on this device is all that is left to do.
+    try {
+      await client.auth.signOut(scope: SignOutScope.local);
+    } catch (_) {}
+  }
+
   Future<UserProfile?> fetchCurrentProfile() async {
     final client = _client;
     final user = client?.auth.currentUser;

@@ -198,6 +198,15 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteAccount() async {
+    await repository.deleteAccount();
+    _profile = null;
+    _profileError = null;
+    _guestMode = false;
+    _passwordRecovery = false;
+    notifyListeners();
+  }
+
   void reportRequestSuccess() {
     if (!_offline) return;
     _offline = false;

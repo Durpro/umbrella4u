@@ -217,6 +217,32 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _savingDiscoverability = false;
   bool _signingOut = false;
+  bool _deletingAccount = false;
+
+  Future<void> _deleteAccount() async {
+    final controller = AppScope.of(context);
+    final username = controller.profile?.username.trim() ?? '';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      // Nothing here should close by accident.
+      barrierDismissible: false,
+      builder: (_) => _DeleteAccountDialog(username: username),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deletingAccount = true);
+    try {
+      await controller.deleteAccount();
+      if (!mounted) return;
+      // The account is gone, so the root swaps back to the welcome screen.
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (error) {
+      if (mounted) {
+        setState(() => _deletingAccount = false);
+        showAppMessage(context, friendlyError(error), error: true);
+      }
+    }
+  }
 
   Future<void> _setDiscoverable(bool value) async {
     setState(() => _savingDiscoverability = true);
@@ -408,7 +434,153 @@ class _SettingsScreenState extends State<SettingsScreen> {
           text:
               'Your email is used for login and account recovery. It is never shown on your public profile.',
         ),
+        if (controller.isLoggedIn) ...[
+          const SizedBox(height: 24),
+          const _SectionLabel('Danger zone'),
+          _SurfaceCard(
+            padding: EdgeInsets.zero,
+            child: _SettingsRow(
+              icon: Icons.delete_forever_outlined,
+              title: 'Delete my account',
+              subtitle:
+                  'Permanently erase your stories, your support, and your login. '
+                  'This cannot be undone.',
+              destructive: true,
+              onTap: _deletingAccount ? null : _deleteAccount,
+              trailing: _deletingAccount
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CupertinoActivityIndicator(radius: 10),
+                    )
+                  : null,
+            ),
+          ),
+        ],
       ],
+    );
+  }
+}
+
+/// Asks for the member's own username before it will let the delete through.
+/// Account deletion cannot be undone, so a single tap is not enough friction.
+class _DeleteAccountDialog extends StatefulWidget {
+  const _DeleteAccountDialog({required this.username});
+
+  final String username;
+
+  @override
+  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
+  final _confirmation = TextEditingController();
+
+  @override
+  void dispose() {
+    _confirmation.dispose();
+    super.dispose();
+  }
+
+  bool get _matches =>
+      widget.username.isNotEmpty &&
+      _confirmation.text.trim().toLowerCase() == widget.username.toLowerCase();
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      icon: const Icon(
+        Icons.warning_amber_rounded,
+        color: Color(0xFFC33E55),
+        size: 30,
+      ),
+      title: const Text('Delete your account?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'This permanently removes:',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 9),
+          const _DeleteFact('Every story you shared, named and anonymous'),
+          const _DeleteFact('The umbrellas, notes, hugs and votes you gave'),
+          const _DeleteFact('Your profile, streak and badges'),
+          const _DeleteFact('Your thank-yous, and your login'),
+          const SizedBox(height: 13),
+          const Text(
+            'This cannot be undone, and nobody can bring it back for you.',
+            style: TextStyle(
+              color: Color(0xFF9B3448),
+              fontSize: 12.5,
+              height: 1.4,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Type @${widget.username} to confirm',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 7),
+          TextField(
+            controller: _confirmation,
+            autocorrect: false,
+            enableSuggestions: false,
+            textCapitalization: TextCapitalization.none,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              prefixText: '@',
+              hintText: widget.username,
+              isDense: true,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Keep my account'),
+        ),
+        FilledButton(
+          onPressed: _matches ? () => Navigator.of(context).pop(true) : null,
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFC33E55),
+          ),
+          child: const Text('Delete forever'),
+        ),
+      ],
+    );
+  }
+}
+
+class _DeleteFact extends StatelessWidget {
+  const _DeleteFact(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: Icon(
+              Icons.remove_rounded,
+              size: 14,
+              color: AppTheme.mutedInk,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
+          ),
+        ],
+      ),
     );
   }
 }
