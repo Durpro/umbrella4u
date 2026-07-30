@@ -1,16 +1,27 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/app_controller.dart';
+import 'core/push_notification_service.dart';
 import 'core/app_theme.dart';
 import 'data/umbrella_repository.dart';
+import 'firebase_options.dart';
 import 'features/auth/auth_screens.dart';
 import 'features/shell/app_shell.dart';
 import 'widgets/app_components.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (PushNotificationService.isSupported || kIsWeb) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    await PushNotificationService.instance.initialize();
+  }
 
   SupabaseClient? client;
   if (AppConfig.isSupabaseConfigured) {

@@ -3,19 +3,28 @@ import 'package:flutter/material.dart';
 import 'app_models.dart';
 
 class AppTheme {
-  static const background = Color(0xFFE9DDF0);
-  static const surface = Color(0xFFFCF8FD);
-  static const softSurface = Color(0xFFF3EAF6);
-  static const ink = Color(0xFF281B2E);
-  static const secondaryInk = Color(0xFF66556D);
-  static const mutedInk = Color(0xFF88768E);
-  static const border = Color(0xFFD9CBE0);
-  static const navigationPlum = Color(0xFF2E1836);
-  static const navigationPlumDeep = Color(0xFF211027);
-  static const navigationOn = Color(0xFFFFF7FC);
-  static const navigationMuted = Color(0xFFC8B4CD);
+  // Umbrella4U's core palette.
+  static const deepPurple = Color(0xFF24182F);
+  static const violet = Color(0xFF76509A);
+  static const lilac = Color(0xFFC49AEA);
+  static const lavender = Color(0xFFD8B6F4);
+  static const cloudWhite = Color(0xFFFAF7FF);
+
+  static const background = lavender;
+  static const surface = cloudWhite;
+  static const softSurface = Color(0xFFF0E2FB);
+  static const ink = deepPurple;
+  static const secondaryInk = Color(0xFF4E3962);
+  static const mutedInk = Color(0xFF725D83);
+  static const border = lilac;
+  static const navigationPlum = deepPurple;
+  static const navigationPlumDeep = Color(0xFF180F20);
+  static const navigationOn = cloudWhite;
+  static const navigationMuted = Color(0xFFD8B6F4);
 
   static ThemeData build(AppThemeChoice choice) {
+    const nunitoSans = 'Nunito Sans';
+    const fraunces = 'Fraunces';
     final themedBackground = Color.alphaBlend(
       choice.accent.withValues(alpha: 0.14),
       background,
@@ -51,6 +60,7 @@ class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
+      fontFamily: nunitoSans,
       scaffoldBackgroundColor: themedBackground,
       canvasColor: themedBackground,
       cardColor: themedSurface,
@@ -71,41 +81,61 @@ class AppTheme {
           TargetPlatform.windows: LiquidPageTransitionsBuilder(),
         },
       ),
-      textTheme: const TextTheme(
+      textTheme: TextTheme(
         displaySmall: TextStyle(
           color: ink,
           fontSize: 34,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w900,
           letterSpacing: -1.3,
           height: 1.08,
+          fontFamily: fraunces,
         ),
         headlineMedium: TextStyle(
           color: ink,
           fontSize: 28,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w900,
           letterSpacing: -0.8,
           height: 1.12,
+          fontFamily: fraunces,
         ),
         headlineSmall: TextStyle(
           color: ink,
           fontSize: 23,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w900,
           letterSpacing: -0.5,
+          fontFamily: fraunces,
         ),
         titleLarge: TextStyle(
           color: ink,
           fontSize: 20,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w900,
           letterSpacing: -0.3,
+          fontFamily: fraunces,
         ),
         titleMedium: TextStyle(
           color: ink,
           fontSize: 16,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w900,
+          fontFamily: nunitoSans,
         ),
-        bodyLarge: TextStyle(color: secondaryInk, fontSize: 16, height: 1.5),
-        bodyMedium: TextStyle(color: secondaryInk, fontSize: 14, height: 1.45),
-        bodySmall: TextStyle(color: mutedInk, fontSize: 12, height: 1.35),
+        bodyLarge: TextStyle(
+          color: secondaryInk,
+          fontSize: 16,
+          height: 1.5,
+          fontFamily: nunitoSans,
+        ),
+        bodyMedium: TextStyle(
+          color: secondaryInk,
+          fontSize: 14,
+          height: 1.45,
+          fontFamily: nunitoSans,
+        ),
+        bodySmall: TextStyle(
+          color: mutedInk,
+          fontSize: 12,
+          height: 1.35,
+          fontFamily: nunitoSans,
+        ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -140,7 +170,10 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),
-          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+          textStyle: TextStyle(
+            fontFamily: nunitoSans,
+            fontWeight: FontWeight.w900,
+          ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -151,7 +184,10 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),
-          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+          textStyle: TextStyle(
+            fontFamily: nunitoSans,
+            fontWeight: FontWeight.w900,
+          ),
         ),
       ),
       cardTheme: CardThemeData(
@@ -168,8 +204,9 @@ class AppTheme {
         selectedColor: choice.accent.withValues(alpha: 0.14),
         side: BorderSide(color: themedBorder),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
-        labelStyle: const TextStyle(
+        labelStyle: TextStyle(
           color: secondaryInk,
+          fontFamily: nunitoSans,
           fontWeight: FontWeight.w600,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
@@ -209,7 +246,10 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: navigationPlum,
-        contentTextStyle: const TextStyle(color: Colors.white),
+        contentTextStyle: TextStyle(
+          color: Colors.white,
+          fontFamily: nunitoSans,
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         behavior: SnackBarBehavior.floating,
         elevation: 0,

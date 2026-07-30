@@ -67,6 +67,14 @@ class InboxPageState extends State<InboxPage>
     }
   }
 
+  /// Keeps the pull-to-refresh header open for the same length of time as
+  /// the refresh itself, so the completed gesture feels deliberate.
+  Future<void> _refreshWithExtendedHold() async {
+    final stopwatch = Stopwatch()..start();
+    await refresh();
+    await Future<void>.delayed(stopwatch.elapsed);
+  }
+
   Future<void> _sendThanks(InboxItem item, String message) async {
     final umbrellaId = item.umbrellaId;
     if (umbrellaId == null || _busyId != null) return;
@@ -107,7 +115,7 @@ class InboxPageState extends State<InboxPage>
     return _InboxRefreshFrame(
       title: 'Inbox',
       subtitle: 'Umbrellas, kind words, and thank-yous.',
-      onRefresh: refresh,
+      onRefresh: _refreshWithExtendedHold,
       trailing: _loading
           ? CupertinoActivityIndicator(
               radius: 9,

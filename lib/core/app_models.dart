@@ -122,9 +122,9 @@ const appThemeChoices = <AppThemeChoice>[
   AppThemeChoice(
     key: 'purple',
     name: 'Umbrella',
-    accent: Color(0xFF75558F),
-    deep: Color(0xFF4A2D5D),
-    note: 'Cozy muted amethyst',
+    accent: Color(0xFF76509A),
+    deep: Color(0xFF24182F),
+    note: 'Umbrella4U violet',
   ),
   AppThemeChoice(
     key: 'ink',

@@ -39,6 +39,9 @@ dependencies:
   characters: ^1.4.1
   supabase_flutter: ^2.16.0
   url_launcher: ^6.3.2
+  firebase_core: ^4.12.1
+  firebase_messaging: ^16.4.3
+  flutter_local_notifications: ^22.2.0
 
 dev_dependencies:
   flutter_test:
@@ -64,6 +67,25 @@ flutter:
 
   assets:
     - assets/images/umbrella_logo.png
+    - assets/images/team/ricky_chen.jpg
+    - assets/images/team/kaylee_hu.jpg
+    - assets/images/team/kevin_qian.jpg
+    - assets/images/team/sophie_zou.jpg
+    - assets/images/team/kasra.jpg
+    - assets/images/team/blake.jpg
+    - assets/images/team/norman.jpg
+
+  fonts:
+    - family: Fraunces
+      fonts:
+        - asset: assets/fonts/Fraunces.ttf
+          weight: 900
+    - family: Nunito Sans
+      fonts:
+        - asset: assets/fonts/NunitoSans.ttf
+          weight: 400
+        - asset: assets/fonts/NunitoSans.ttf
+          weight: 900
 
   # To add assets to your application, add an assets section, like this:
   # assets:

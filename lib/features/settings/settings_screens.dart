@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_controller.dart';
 import '../../core/app_models.dart';
 import '../../core/app_theme.dart';
+import '../../core/push_notification_service.dart';
 import '../../data/umbrella_repository.dart';
 import '../../widgets/app_components.dart';
 
@@ -38,6 +39,14 @@ Future<void> openMoreMenu(BuildContext context) async {
         decoration: BoxDecoration(
           color: Theme.of(sheetContext).scaffoldBackgroundColor,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x6620152A),
+              blurRadius: 28,
+              spreadRadius: -3,
+              offset: Offset(0, -7),
+            ),
+          ],
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -216,8 +225,66 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _savingDiscoverability = false;
+  bool _loadingPushNotifications = true;
+  bool _savingPushNotifications = false;
+  bool _pushNotificationsEnabled = false;
+  bool _loadedPushNotifications = false;
   bool _signingOut = false;
   bool _deletingAccount = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_loadedPushNotifications) {
+      _loadedPushNotifications = true;
+      _loadPushNotificationPreference();
+    }
+  }
+
+  Future<void> _loadPushNotificationPreference() async {
+    final controller = AppScope.of(context);
+    try {
+      final enabled = await PushNotificationService.instance
+          .isEnabledForCurrentUser(controller.repository);
+      if (mounted) setState(() => _pushNotificationsEnabled = enabled);
+    } catch (_) {
+      // Settings stays usable if a token check fails while offline.
+    } finally {
+      if (mounted) setState(() => _loadingPushNotifications = false);
+    }
+  }
+
+  Future<void> _setPushNotifications(bool value) async {
+    final controller = AppScope.of(context);
+    setState(() => _savingPushNotifications = true);
+    try {
+      late final bool enabled;
+      if (value) {
+        enabled = await PushNotificationService.instance.requestAndEnable(
+          controller.repository,
+        );
+      } else {
+        await PushNotificationService.instance.disableForCurrentUser(
+          controller.repository,
+        );
+        enabled = false;
+      }
+      if (!mounted) return;
+      setState(() => _pushNotificationsEnabled = enabled);
+      showAppMessage(
+        context,
+        enabled
+            ? 'Push notifications are on. We will keep them private.'
+            : value
+            ? 'Notifications are off. You can allow them in your phone settings.'
+            : 'Push notifications are off for this phone.',
+      );
+    } catch (error) {
+      if (mounted) showAppMessage(context, friendlyError(error), error: true);
+    } finally {
+      if (mounted) setState(() => _savingPushNotifications = false);
+    }
+  }
 
   Future<void> _deleteAccount() async {
     final controller = AppScope.of(context);
@@ -371,6 +438,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     : Switch.adaptive(
                         value: profile?.discoverable ?? false,
                         onChanged: profile == null ? null : _setDiscoverable,
+                      ),
+              ),
+              const Divider(height: 1, indent: 68),
+              _SettingsRow(
+                icon: Icons.notifications_outlined,
+                title: 'Push notifications',
+                subtitle: profile == null
+                    ? 'Log in to manage notifications for this phone.'
+                    : !PushNotificationService.isSupported
+                    ? 'Available in the Haven mobile app on iPhone and Android.'
+                    : 'Get private updates about support activity. Story text stays out of notifications.',
+                trailing: _loadingPushNotifications || _savingPushNotifications
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CupertinoActivityIndicator(radius: 10),
+                      )
+                    : Switch.adaptive(
+                        value: _pushNotificationsEnabled,
+                        onChanged:
+                            profile == null ||
+                                !PushNotificationService.isSupported
+                            ? null
+                            : _setPushNotifications,
                       ),
               ),
               const Divider(height: 1, indent: 68),
@@ -1086,13 +1177,25 @@ class TeamScreen extends StatelessWidget {
   const TeamScreen({super.key});
 
   static const _members = [
-    ('Ricky Chen', 'Founder · CEO · CTO'),
-    ('Kaylee Hu', 'Art Director · Washington Chapter President'),
-    ('Kevin Qian', 'Outreach & Advocacy'),
-    ('Sophie Zou', 'Marketing & Social Media'),
-    ('Kasra', 'Events Coordination & Networking'),
-    ('Blake', 'Business & Strategy'),
-    ('Norman', 'Backend Developer & Aerial Photographer'),
+    ('Ricky Chen', 'Founder · CEO · CTO', 'assets/images/team/ricky_chen.jpg'),
+    (
+      'Kaylee Hu',
+      'Art Director · Washington Chapter President',
+      'assets/images/team/kaylee_hu.jpg',
+    ),
+    ('Kevin Qian', 'Outreach & Advocacy', 'assets/images/team/kevin_qian.jpg'),
+    (
+      'Sophie Zou',
+      'Marketing & Social Media',
+      'assets/images/team/sophie_zou.jpg',
+    ),
+    (
+      'Kasra',
+      'Events Coordination & Networking',
+      'assets/images/team/kasra.jpg',
+    ),
+    ('Blake', 'Business & Strategy', 'assets/images/team/blake.jpg'),
+    ('Norman', 'Backend Developer', 'assets/images/team/norman.jpg'),
   ];
 
   @override
@@ -1146,7 +1249,11 @@ class TeamScreen extends StatelessWidget {
         ..._members.map(
           (member) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: _TeamMemberTile(name: member.$1, role: member.$2),
+            child: _TeamMemberTile(
+              name: member.$1,
+              role: member.$2,
+              photoAsset: member.$3,
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -1851,10 +1958,15 @@ class _LegalSection extends StatelessWidget {
 }
 
 class _TeamMemberTile extends StatelessWidget {
-  const _TeamMemberTile({required this.name, required this.role});
+  const _TeamMemberTile({
+    required this.name,
+    required this.role,
+    required this.photoAsset,
+  });
 
   final String name;
   final String role;
+  final String photoAsset;
 
   @override
   Widget build(BuildContext context) {
@@ -1864,9 +1976,9 @@ class _TeamMemberTile extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 46,
-            height: 46,
-            alignment: Alignment.center,
+            width: 52,
+            height: 52,
+            padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -1876,12 +1988,24 @@ class _TeamMemberTile extends StatelessWidget {
               ),
               shape: BoxShape.circle,
             ),
-            child: Text(
-              initial,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
+            child: ClipOval(
+              child: Image.asset(
+                photoAsset,
+                fit: BoxFit.cover,
+                filterQuality: FilterQuality.medium,
+                semanticLabel: '$name portrait',
+                errorBuilder: (context, error, stackTrace) => Container(
+                  alignment: Alignment.center,
+                  color: Theme.of(context).colorScheme.primary,
+                  child: Text(
+                    initial,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),

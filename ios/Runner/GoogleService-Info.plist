@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyCfjquW8nqqyd26pw_9f5Gw4-Ug6_41w4g</string>
+	<key>GCM_SENDER_ID</key>
+	<string>6743819472</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>ca.umbrella4u.haven</string>
+	<key>PROJECT_ID</key>
+	<string>umbrella4u-notifs</string>
+	<key>STORAGE_BUCKET</key>
+	<string>umbrella4u-notifs.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:6743819472:ios:bf48d3275097e2d6870ad5</string>
+</dict>
+</plist>

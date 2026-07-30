@@ -1240,9 +1240,21 @@ class _AuthScaffold extends StatelessWidget {
               ),
             ),
             SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
-                child: child,
+              child: LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight - 44,
+                    ),
+                    // The welcome layout uses a Spacer for its relaxed,
+                    // full-screen composition. IntrinsicHeight keeps that
+                    // composition on tall screens while allowing it to scroll
+                    // instead of overflowing on short or narrow windows.
+                    child: IntrinsicHeight(child: child),
+                  ),
+                ),
               ),
             ),
           ],

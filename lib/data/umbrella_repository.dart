@@ -42,6 +42,50 @@ class UmbrellaRepository {
   Stream<AuthState> get authChanges =>
       _client?.auth.onAuthStateChange ?? const Stream<AuthState>.empty();
 
+  Future<void> upsertPushToken({
+    required String token,
+    required String platform,
+  }) async {
+    final client = _requireClient();
+    final user = _requireUser();
+    await client.from('device_push_tokens').upsert({
+      'user_id': user.id,
+      'token': token,
+      'platform': platform,
+      'enabled': true,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'user_id,token');
+  }
+
+  Future<bool> isPushTokenEnabled(String token) async {
+    final client = _client;
+    final user = client?.auth.currentUser;
+    if (client == null || user == null) return false;
+    final row = await client
+        .from('device_push_tokens')
+        .select('enabled')
+        .eq('user_id', user.id)
+        .eq('token', token)
+        .maybeSingle();
+    return row?['enabled'] == true;
+  }
+
+  Future<void> setPushTokenEnabled({
+    required String token,
+    required bool enabled,
+  }) async {
+    final client = _requireClient();
+    final user = _requireUser();
+    await client
+        .from('device_push_tokens')
+        .update({
+          'enabled': enabled,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('user_id', user.id)
+        .eq('token', token);
+  }
+
   Future<AuthResponse> signIn({
     required String email,
     required String password,

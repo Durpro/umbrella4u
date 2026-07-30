@@ -100,6 +100,14 @@ class HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin {
     }
   }
 
+  /// Keeps the pull-to-refresh header open for the same length of time as
+  /// the refresh itself, so the completed gesture feels deliberate.
+  Future<void> _refreshWithExtendedHold() async {
+    final stopwatch = Stopwatch()..start();
+    await refresh();
+    await Future<void>.delayed(stopwatch.elapsed);
+  }
+
   Future<void> _selectCategory(String? category) async {
     if (_category == category) return;
     setState(() => _category = category);
@@ -122,7 +130,7 @@ class HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin {
           parent: AlwaysScrollableScrollPhysics(),
         ),
         slivers: [
-          CupertinoSliverRefreshControl(onRefresh: refresh),
+          CupertinoSliverRefreshControl(onRefresh: _refreshWithExtendedHold),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 122),
             sliver: SliverList(

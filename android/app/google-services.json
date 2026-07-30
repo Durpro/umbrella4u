@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "6743819472",
+    "project_id": "umbrella4u-notifs",
+    "storage_bucket": "umbrella4u-notifs.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:6743819472:android:ae109d660b6187a6870ad5",
+        "android_client_info": {
+          "package_name": "ca.umbrella4u.haven"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBXCLHKG44crzQsgduJ_DEtx6cD14E6DKg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -202,24 +202,23 @@ class PremiumBottomNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderRadius = BorderRadius.circular(31);
     final highContrast = MediaQuery.maybeOf(context)?.highContrast ?? false;
-    final reduceMotion =
-        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
     final scheme = Theme.of(context).colorScheme;
     final selectorPosition = pagePosition.clamp(0.0, 4.0).toDouble();
+    final travelMorph =
+        ((selectorPosition - selectorPosition.round()).abs() * 2)
+            .clamp(0.0, 1.0)
+            .toDouble();
     final postMorph = (1 - (selectorPosition - 2).abs())
         .clamp(0.0, 1.0)
         .toDouble();
-    final selectorWidth = 42 + (10 * postMorph);
-    final selectorHeight = 33 + (19 * postMorph);
-    final selectorTop = 20.4 - (9 * postMorph);
-    final glassSurface = AnimatedContainer(
-      duration: reduceMotion
-          ? Duration.zero
-          : const Duration(milliseconds: 420),
-      curve: Curves.easeOutBack,
-      height: 94,
+    final barHeight = 71 + (5 * travelMorph);
+    final borderRadius = BorderRadius.circular(27 + (3 * travelMorph));
+    final selectorWidth = 42 + (4 * postMorph) + (7 * travelMorph);
+    final selectorHeight = 29 + (12 * postMorph) + (3 * travelMorph);
+    final selectorTop = 12 - (5 * postMorph) + (2 * travelMorph);
+    final glassSurface = Container(
+      height: barHeight,
       padding: const EdgeInsets.symmetric(horizontal: 7),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -264,7 +263,7 @@ class PremiumBottomNavigation extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: AppTheme.navigationOn,
                             borderRadius: BorderRadius.circular(
-                              14 + (85 * postMorph),
+                              14 + (85 * postMorph) + (10 * travelMorph),
                             ),
                             border: Border.all(
                               color: Colors.white.withValues(alpha: 0.25),
@@ -415,7 +414,7 @@ class _NavigationItem extends StatelessWidget {
             ),
             borderRadius: BorderRadius.circular(18),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 3),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -434,7 +433,7 @@ class _NavigationItem extends StatelessWidget {
                             duration: duration,
                             curve: Curves.easeOutCubic,
                             width: 42,
-                            height: 33,
+                            height: 30,
                             decoration: const BoxDecoration(),
                             child: Icon(
                               selected ? (selectedIcon ?? icon) : icon,
@@ -465,7 +464,7 @@ class _NavigationItem extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                   AnimatedDefaultTextStyle(
                     duration: duration,
                     curve: Curves.easeOutCubic,
@@ -531,14 +530,14 @@ class _PostNavigationItem extends StatelessWidget {
                     duration: duration,
                     curve: Curves.easeOutBack,
                     child: SizedBox(
-                      width: 52,
-                      height: 52,
+                      width: 44,
+                      height: 44,
                       child: Center(
                         child: AnimatedContainer(
                           duration: duration,
                           curve: Curves.easeOutCubic,
-                          width: selected ? 44 : 49,
-                          height: selected ? 44 : 49,
+                          width: selected ? 40 : 42,
+                          height: selected ? 40 : 42,
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
@@ -563,14 +562,14 @@ class _PostNavigationItem extends StatelessWidget {
                           child: Icon(
                             selected ? Icons.edit_rounded : Icons.add_rounded,
                             color: Colors.white,
-                            size: 24,
+                            size: 22,
                           ),
                         ),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 1),
                 AnimatedDefaultTextStyle(
                   duration: duration,
                   curve: Curves.easeOutCubic,

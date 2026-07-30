@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/umbrella_repository.dart';
 import 'app_models.dart';
+import 'push_notification_service.dart';
 
 class AppController extends ChangeNotifier {
   AppController(this.repository);
@@ -55,8 +56,12 @@ class AppController extends ChangeNotifier {
             return;
           }
           await refreshProfile();
+          await PushNotificationService.instance.syncSignedInUser(repository);
         });
-        if (isLoggedIn) await refreshProfile(notify: false);
+        if (isLoggedIn) {
+          await refreshProfile(notify: false);
+          await PushNotificationService.instance.syncSignedInUser(repository);
+        }
       } else {
         _guestMode = true;
       }
@@ -86,6 +91,7 @@ class AppController extends ChangeNotifier {
     await repository.signIn(email: email, password: password);
     _guestMode = false;
     await refreshProfile();
+    await PushNotificationService.instance.syncSignedInUser(repository);
   }
 
   Future<bool> signUp({required String email, required String password}) async {
@@ -93,6 +99,7 @@ class AppController extends ChangeNotifier {
     if (response.session != null) {
       _guestMode = false;
       await refreshProfile();
+      await PushNotificationService.instance.syncSignedInUser(repository);
       return true;
     }
     return false;
@@ -190,6 +197,11 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    try {
+      await PushNotificationService.instance.disableForCurrentUser(repository);
+    } catch (_) {
+      // A sign-out should never be blocked by a temporary push-token error.
+    }
     await repository.signOut();
     _profile = null;
     _profileError = null;
